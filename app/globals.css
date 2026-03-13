@@ -1,0 +1,127 @@
+:root {
+  --ss-primary: #3a6ff8;
+  --ss-primary-soft: #e4ecff;
+  --ss-dark: #101826;
+  --ss-muted: #6b7280;
+  --ss-accent: #22c55e;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: radial-gradient(
+    circle at top left,
+    #e4ecff 0,
+    #f9fafb 45%,
+    #ffffff 100%
+  );
+  color: var(--ss-dark);
+}
+
+.navbar-brand span {
+  font-weight: 700;
+}
+
+.hero-section {
+  padding-top: 6rem;
+  padding-bottom: 5rem;
+}
+
+.hero-badge {
+  background: rgba(58, 111, 248, 0.08);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--ss-primary);
+}
+
+.hero-badge-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--ss-accent);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.25);
+}
+
+.hero-title {
+  font-size: clamp(2.5rem, 3.4vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.hero-highlight {
+  background: linear-gradient(120deg, #3a6ff8, #22c55e);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-subtitle {
+  font-size: 1.05rem;
+  color: var(--ss-muted);
+}
+
+.hero-card {
+  background: #ffffff;
+  border-radius: 1.6rem;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.16);
+  padding: 1.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.metric-pill {
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  background: #f9fafb;
+}
+
+.metric-pill strong {
+  color: var(--ss-dark);
+}
+
+.budget-bar {
+  height: 0.6rem;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.budget-bar-fill {
+  height: 100%;
+  width: 62%;
+  background: linear-gradient(90deg, #22c55e, #3a6ff8);
+}
+
+.category-pill {
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  background: rgba(15, 23, 42, 0.02);
+}
+
+.feature-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ss-primary-soft);
+  color: var(--ss-primary);
+}
+
+.pill {
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+  background: #f3f4f6;
+}
+
+.footer {
+  border-top: 1px solid #e5e7eb;
+}
+
