@@ -1,49 +1,211 @@
 "use client";
-
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { AppNav } from "../components/AppNav";
-import {
-  dummyPriceDatabase,
-  getPrices,
-  getCheapestStore,
-  STORES,
-} from "../data/dummyPrices";
+import { dummyPriceDatabase, getCheapestStore } from "../data/dummyPrices";
 import { useGroceryListFirestore } from "../hooks/useGroceryListFirestore";
 import { calculateBasketTotals } from "../lib/cheapestBasket";
+import { useAuth } from "../contexts/AuthContext";
 
-const STORE_LABELS = {
-  aldi: "Aldi",
-  coles: "Coles",
-  woolworths: "Woolworths",
-};
+const STORE_LABELS = { aldi: "Aldi", coles: "Coles", woolworths: "Woolworths" };
+const STORES = ["aldi", "coles", "woolworths"];
 
-function formatPrice(value) {
-  return value == null ? "—" : `$${Number(value).toFixed(2)}`;
+// ─── Normalisation ────────────────────────────────────────────────────────────
+
+function extractQuantity(name) {
+  const weightVol = name.match(/(\d+(\.\d+)?)\s*(ml|l|g|kg)/i);
+  if (weightVol) return { value: parseFloat(weightVol[1]), unit: weightVol[3].toLowerCase() };
+  const sheets = name.match(/(\d+(\.\d+)?)\s*(sheets?)/i);
+  if (sheets) return { value: parseFloat(sheets[1]), unit: "sheets" };
+  const pack = name.match(/(\d+(\.\d+)?)\s*(pk|pack|rolls?)/i);
+  if (pack) return { value: parseFloat(pack[1]), unit: pack[3].toLowerCase() };
+  return null;
 }
 
+function toBaseUnit(value, unit) {
+  switch (unit) {
+    case "ml":     return { value: value / 1000, unit: "l" };
+    case "l":      return { value, unit: "l" };
+    case "g":      return { value: value / 1000, unit: "kg" };
+    case "kg":     return { value, unit: "kg" };
+    case "sheets":
+    case "sheet":  return { value: value / 100, unit: "100 sheets" };
+    default:       return { value, unit };
+  }
+}
+
+function getNormalisedPrice(price, productName) {
+  const raw = extractQuantity(productName);
+  if (!raw) return null;
+  const base = toBaseUnit(raw.value, raw.unit);
+  if (base.value === 0) return null;
+  return { normalisedPrice: price / base.value, unit: base.unit };
+}
+
+// ─── Formatting ───────────────────────────────────────────────────────────────
+
+function formatPrice(value) {
+  return value == null ? "N/A" : `$${Number(value).toFixed(2)}`;
+}
+
+function formatNormLabel(normalisedPrice, normalisedUnit) {
+  if (normalisedPrice == null || normalisedUnit == null) return null;
+  return `$${Number(normalisedPrice).toFixed(2)}/${normalisedUnit}`;
+}
+
+// ─── Coles proxy fetch ────────────────────────────────────────────────────────
+
+async function searchColesViaProxy(searchTerm) {
+  try {
+    const res = await fetch(`/api/coles-proxy?q=${encodeURIComponent(searchTerm)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.result ?? null;
+  } catch (e) {
+    console.warn("Coles proxy fetch failed:", e.message);
+    return null;
+  }
+}
+
+// ─── Price lookup helpers ─────────────────────────────────────────────────────
+
+function flattenForBasket(livePricesByItem) {
+  const out = {};
+  for (const [item, stores] of Object.entries(livePricesByItem)) {
+    out[item] = {};
+    for (const store of STORES) {
+      out[item][store] = stores[store]?.price ?? null;
+    }
+  }
+  return out;
+}
+
+function getStorePrices(itemName, livePricesByItem) {
+  const key = itemName.trim().toLowerCase();
+  if (livePricesByItem) {
+    return livePricesByItem[key] ?? { aldi: null, coles: null, woolworths: null };
+  }
+  const dummy = dummyPriceDatabase[key];
+  if (!dummy) return { aldi: null, coles: null, woolworths: null };
+  return {
+    aldi:       dummy.aldi       != null ? { price: dummy.aldi,       normalisedPrice: null, normalisedUnit: null, productName: null, url: null } : null,
+    coles:      dummy.coles      != null ? { price: dummy.coles,      normalisedPrice: null, normalisedUnit: null, productName: null, url: null } : null,
+    woolworths: dummy.woolworths != null ? { price: dummy.woolworths, normalisedPrice: null, normalisedUnit: null, productName: null, url: null } : null,
+  };
+}
+
+// ─── PriceCell ────────────────────────────────────────────────────────────────
+
+function PriceCell({ storeResult, quantity }) {
+  if (!storeResult || storeResult.price == null) {
+    return <span className="text-muted">N/A</span>;
+  }
+
+  // Show normalised price × qty as the headline figure when available
+  const displayPrice = storeResult.normalisedPrice != null
+    ? storeResult.normalisedPrice * quantity
+    : storeResult.price * quantity;
+
+  const normLabel = formatNormLabel(storeResult.normalisedPrice, storeResult.normalisedUnit);
+
+  const inner = (
+    <span>
+      <span className="fw-semibold">{formatPrice(displayPrice)}</span>
+      {normLabel && (
+        <span className="d-block" style={{ fontSize: "0.72rem", color: "var(--ss-muted)" }}>
+          {normLabel}
+        </span>
+      )}
+      {storeResult.productName && (
+        <span className="d-block" style={{ fontSize: "0.72rem", color: "var(--ss-muted)" }}>
+          {storeResult.productName}
+        </span>
+      )}
+    </span>
+  );
+
+  if (storeResult.url) {
+    return (
+      <a href={storeResult.url} target="_blank" rel="noopener noreferrer"
+        style={{ textDecoration: "none", color: "inherit" }}>
+        {inner}
+        <span style={{ fontSize: "0.68rem", color: "var(--ss-primary)", display: "block" }}>↗ view</span>
+      </a>
+    );
+  }
+  return inner;
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function StorePricesPage() {
+  const { user, authLoading } = useAuth();
+  const { list, loading } = useGroceryListFirestore(user);
   const year = new Date().getFullYear();
-  const { list, loading } = useGroceryListFirestore();
-  const basketResult = list.length > 0 ? calculateBasketTotals(list, dummyPriceDatabase) : null;
+  const [livePricesByItem, setLivePricesByItem] = useState(null);
+  const [fetchLoading, setFetchLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+
+  const flatPrices = livePricesByItem ? flattenForBasket(livePricesByItem) : dummyPriceDatabase;
+  const basketResult = list.length > 0 ? calculateBasketTotals(list, flatPrices) : null;
+
+  const fetchLivePrices = useCallback(async () => {
+    if (!list.length) return;
+    setFetchLoading(true);
+    setFetchError(null);
+    try {
+      // Step 1: Woolworths + Aldi server-side
+      const res = await fetch("/api/prices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: list }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFetchError(data?.errors?.join(" ") || "Failed to fetch prices");
+        return;
+      }
+
+      const combined = data.pricesByItem || {};
+
+      // Step 2: Coles via server-side proxy (avoids CORS)
+      const terms = [
+        ...new Set(list.map((i) => (i.name || "").trim().toLowerCase()).filter(Boolean)),
+      ];
+      await Promise.all(
+        terms.map(async (term) => {
+          const colesResult = await searchColesViaProxy(term);
+          if (combined[term]) {
+            combined[term].coles = colesResult;
+          } else {
+            combined[term] = { woolworths: null, coles: colesResult, aldi: null };
+          }
+        })
+      );
+
+      setLivePricesByItem({ ...combined });
+      if (data.errors?.length) setFetchError(data.errors.join(" "));
+    } catch (e) {
+      setFetchError(e.message || "Network error");
+    } finally {
+      setFetchLoading(false);
+    }
+  }, [list]);
 
   const rows = list.map((item) => {
-    const prices = getPrices(item.name);
-    const aldiTotal = prices ? prices.aldi * item.quantity : null;
-    const colesTotal = prices ? prices.coles * item.quantity : null;
-    const woolworthsTotal = prices ? prices.woolworths * item.quantity : null;
-    const cheapest = getCheapestStore(prices);
-    return {
-      ...item,
-      prices,
-      aldiTotal,
-      colesTotal,
-      woolworthsTotal,
-      cheapest,
-    };
+    const storePrices = getStorePrices(item.name, livePricesByItem);
+    // Only include stores with real prices in the cheapest calculation
+    const priceMap = {};
+    if (storePrices.aldi?.price != null)       priceMap.aldi       = storePrices.aldi.price;
+    if (storePrices.coles?.price != null)      priceMap.coles      = storePrices.coles.price;
+    if (storePrices.woolworths?.price != null) priceMap.woolworths = storePrices.woolworths.price;
+    const cheapestStore = Object.keys(priceMap).length > 0 ? getCheapestStore(priceMap) : null;
+    return { ...item, storePrices, cheapestStore };
   });
 
   const totals = basketResult?.totalsByStore ?? { aldi: 0, coles: 0, woolworths: 0 };
-  const bestStore = basketResult?.bestStore ?? "aldi";
+  const bestStore = basketResult?.bestStore ?? null;
+  const hasLivePrices = livePricesByItem != null;
 
   return (
     <>
@@ -55,122 +217,130 @@ export default function StorePricesPage() {
               Store <span className="hero-highlight">price comparison</span>
             </h1>
             <p className="hero-subtitle mb-0">
-              See how much each item costs at Aldi, Coles, and Woolworths. Totals show the cheapest basket for your list.
+              See how much each item costs at Aldi, Coles, and Woolworths.
+              Totals show the cheapest basket for your list.
             </p>
           </div>
 
           <div className="hero-card p-4 mb-4">
-            {loading ? (
+            {authLoading || loading ? (
               <p className="text-muted small mb-0">Loading your list…</p>
             ) : list.length === 0 ? (
               <div className="text-center py-3">
                 <p className="mb-2">Your list is empty.</p>
-                <Link href="/" className="btn btn-primary btn-sm" style={{ backgroundColor: "var(--ss-primary)", borderColor: "var(--ss-primary)" }}>Add items on Grocery List</Link>
+                <Link href="/" className="btn btn-primary btn-sm"
+                  style={{ backgroundColor: "var(--ss-primary)", borderColor: "var(--ss-primary)" }}>
+                  Add items on Grocery List
+                </Link>
               </div>
             ) : (
-            <>
-            <p className="text-muted small mb-3">
-              Your grocery list. Totals use the same algorithm as Budget and Home.
-            </p>
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th className="text-center">Qty</th>
-                    <th className="text-end">Aldi</th>
-                    <th className="text-end">Coles</th>
-                    <th className="text-end">Woolworths</th>
-                    <th>Cheapest</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="fw-semibold">{row.name}</td>
-                      <td className="text-center">{row.quantity}</td>
-                      <td className="text-end">
-                        {row.prices
-                          ? formatPrice(row.aldiTotal)
-                          : "—"}
-                      </td>
-                      <td className="text-end">
-                        {row.prices
-                          ? formatPrice(row.colesTotal)
-                          : "—"}
-                      </td>
-                      <td className="text-end">
-                        {row.prices
-                          ? formatPrice(row.woolworthsTotal)
-                          : "—"}
-                      </td>
-                      <td>
-                        {row.prices ? (
-                          <span className="pill text-nowrap">
-                            {STORE_LABELS[row.cheapest]}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="table-light">
-                  <tr className="fw-bold">
-                    <td colSpan={2}>Basket total</td>
-                    <td className="text-end">
-                      {formatPrice(totals.aldi)}
-                    </td>
-                    <td className="text-end">
-                      {formatPrice(totals.coles)}
-                    </td>
-                    <td className="text-end">
-                      {formatPrice(totals.woolworths)}
-                    </td>
-                    <td>
-                      <span
-                        className="badge rounded-pill"
-                        style={{
-                          backgroundColor: "var(--ss-accent)",
-                          color: "#fff",
-                        }}
-                      >
-                        Best: {STORE_LABELS[bestStore]}
-                      </span>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-            </>
+              <>
+                <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+                  <p className="text-muted small mb-0">
+                    {hasLivePrices
+                      ? "Live prices shown — normalised to standard units. Click a price to view the product."
+                      : "Sample prices shown. Click below to fetch live prices."}
+                  </p>
+                  <button type="button"
+                    className="btn btn-primary btn-sm"
+                    style={{ backgroundColor: "var(--ss-primary)", borderColor: "var(--ss-primary)" }}
+                    onClick={fetchLivePrices}
+                    disabled={fetchLoading}>
+                    {fetchLoading ? "Fetching…" : "Fetch live prices"}
+                  </button>
+                </div>
+
+                {fetchError && (
+                  <div className="alert alert-warning py-2 mb-3 small" role="alert">
+                    {fetchError}
+                  </div>
+                )}
+
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th className="text-center">Qty</th>
+                        <th className="text-end">Aldi</th>
+                        <th className="text-end">Coles</th>
+                        <th className="text-end">Woolworths</th>
+                        <th>Cheapest</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={row.id}>
+                          <td className="fw-semibold">{row.name}</td>
+                          <td className="text-center">{row.quantity}</td>
+                          <td className="text-end">
+                            <PriceCell storeResult={row.storePrices.aldi} quantity={row.quantity} />
+                          </td>
+                          <td className="text-end">
+                            <PriceCell storeResult={row.storePrices.coles} quantity={row.quantity} />
+                          </td>
+                          <td className="text-end">
+                            <PriceCell storeResult={row.storePrices.woolworths} quantity={row.quantity} />
+                          </td>
+                          <td>
+                            {row.cheapestStore
+                              ? <span className="pill text-nowrap">{STORE_LABELS[row.cheapestStore]}</span>
+                              : <span className="text-muted">N/A</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="table-light">
+                      <tr className="fw-bold">
+                        <td colSpan={2}>Basket total</td>
+                        <td className="text-end">{totals.aldi       ? formatPrice(totals.aldi)       : "N/A"}</td>
+                        <td className="text-end">{totals.coles      ? formatPrice(totals.coles)      : "N/A"}</td>
+                        <td className="text-end">{totals.woolworths ? formatPrice(totals.woolworths) : "N/A"}</td>
+                        <td>
+                          {bestStore
+                            ? <span className="badge rounded-pill"
+                                style={{ backgroundColor: "var(--ss-accent)", color: "#fff" }}>
+                                Best: {STORE_LABELS[bestStore]}
+                              </span>
+                            : "N/A"}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </>
             )}
           </div>
 
           {list.length > 0 && (
-          <div className="hero-card p-4">
-            <h5 className="mb-2">Summary</h5>
-            <ul className="list-unstyled mb-0 text-muted small">
-              <li className="mb-1">
-                <strong className="text-dark">Aldi</strong> → {formatPrice(totals.aldi)}
-              </li>
-              <li className="mb-1">
-                <strong className="text-dark">Coles</strong> → {formatPrice(totals.coles)}
-              </li>
-              <li className="mb-1">
-                <strong className="text-dark">Woolworths</strong> → {formatPrice(totals.woolworths)}
-              </li>
-              <li className="mt-2 pt-2 border-top">
-                <strong className="text-dark">Cheapest basket:</strong> {STORE_LABELS[bestStore]} at {formatPrice(totals[bestStore])}
-              </li>
-            </ul>
-          </div>
+            <div className="hero-card p-4">
+              <h5 className="mb-2">Summary</h5>
+              <ul className="list-unstyled mb-0 text-muted small">
+                {STORES.map((store) => (
+                  <li key={store} className="mb-1">
+                    <strong className="text-dark">{STORE_LABELS[store]}</strong> →{" "}
+                    {totals[store] ? formatPrice(totals[store]) : "N/A"}
+                  </li>
+                ))}
+                {bestStore && (
+                  <li className="mt-2 pt-2 border-top">
+                    <strong className="text-dark">Cheapest basket:</strong>{" "}
+                    {STORE_LABELS[bestStore]} at {formatPrice(totals[bestStore])}
+                  </li>
+                )}
+              </ul>
+            </div>
           )}
 
           <div className="mt-4 p-3 rounded-3 bg-light border">
-            <h6 className="mb-2">Real data later</h6>
+            <h6 className="mb-2">How prices are fetched</h6>
             <p className="small text-muted mb-0">
-              Prices above are <strong>dummy data</strong>. For real data, options include: (1) <strong>No official API</strong> — Coles, Woolworths, and Aldi don’t offer public developer APIs. (2) <strong>Reverse‑engineered / community APIs</strong> — e.g. Woolworths’ site uses APIs that can be documented (see GitHub “au-supermarket-apis”). (3) <strong>Third‑party scraping/API services</strong> — e.g. retail data providers that expose Coles/Woolworths/Aldi prices via their own API. (4) <strong>Open datasets</strong> — e.g. community projects like “aus_grocery_price_database” on GitHub. The Supermarket Price Database owner can replace <code>app/data/dummyPrices.js</code> with an API client or imported dataset when ready.
+              Woolworths and Aldi are fetched server-side. Coles is fetched via
+              a server-side proxy to avoid browser CORS restrictions. All prices
+              are normalised to standard units (per kg, per L, per 100 sheets)
+              — weight and volume always take priority over pack counts. Click
+              any price to view the product listing. If no match is found, that
+              cell shows N/A.
             </p>
           </div>
         </div>
@@ -178,12 +348,8 @@ export default function StorePricesPage() {
 
       <footer className="footer py-4">
         <div className="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
-          <span className="text-muted small">
-            © <span>{year}</span> StudentSaver. All rights reserved.
-          </span>
-          <span className="text-muted small">
-            Grocery list → pricing engine (coming soon).
-          </span>
+          <span className="text-muted small">© <span>{year}</span> StudentSaver. All rights reserved.</span>
+          <span className="text-muted small">Prices fetched live from Aldi, Coles &amp; Woolworths.</span>
         </div>
       </footer>
     </>
