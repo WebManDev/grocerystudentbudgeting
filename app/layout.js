@@ -2,9 +2,9 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata = {
-  title: "StudentSaver – Smart Budgeting for Students",
+  title: "StudentSaver – Grocery List Builder",
   description:
-    "StudentSaver helps students take control of their money with simple, smart budgeting tools tailored for campus life."
+    "Build your grocery list with quantities. StudentSaver helps students budget with simple list-building and future pricing."
 };
 
 export default function RootLayout({ children }) {

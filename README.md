@@ -11,14 +11,11 @@ The app is intended to be hosted on Vercel. Next.js is a first‑class framework
 
 ### Current status
 
-- **Implemented**: A static marketing/landing page built with Next.js and Bootstrap.
+- **Implemented**: **Grocery List Builder** — add/remove items, quantity selection, and optional search/autocomplete. Output format: `Milk x1`, `Bread x1`, etc. List state is owned by the page and ready to be passed to a pricing engine.
 - **Not implemented yet**:
+  - Pricing engine (consumes the grocery list)
   - User authentication
-  - Budget tracking features
-  - Data storage and sync with Firebase
-  - Any dynamic functionality beyond the landing page
-
-Right now this project is only a marketing/landing page for StudentSaver. All future application features (sign up, sign in, budgets, spending insights, etc.) will be built on top of this foundation, with Firebase providing backend capabilities.
+  - Budget tracking and data storage (Firebase)
 
 ### Local development
 
@@ -34,12 +31,20 @@ Right now this project is only a marketing/landing page for StudentSaver. All fu
   npm run dev
   ```
 
-  Then open `http://localhost:3000` in your browser to view the landing page.
+  Then open `http://localhost:3000` in your browser to use the Grocery List Builder.
 
 ### Deploying to Vercel
 
 1. Push this repo to GitHub, GitLab, or Bitbucket.
 2. Create a project on Vercel and import the repo.
 3. Vercel will auto-detect **Next.js** and use `npm run build` as the build command and `next start` as the default.
-4. Since the current app is just a landing page, no environment variables or Firebase configuration are required yet.
+4. No environment variables or Firebase configuration are required for the Grocery List Builder.
+
+### Grocery List Builder
+
+- **Add** items by name with optional **search/autocomplete** (common groceries).
+- **Quantity** selection (1–20) when adding and editable per row.
+- **Remove** items from the list.
+- **Output** is shown as `Item x1`, `Item x2`, etc., and is ready to be passed to a pricing engine.
+- **Owner responsibility**: The page owns the list state (`list` / `setList`) and passes it to `GroceryListBuilder`; the same list can be passed to a future pricing engine component.
 
