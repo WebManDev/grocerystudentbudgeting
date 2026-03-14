@@ -38,15 +38,6 @@ function useGroceryListFirestore() {
     }
   }, []);
 
-  if (!mounted) {
-    return {
-      list: [],
-      setList: noop,
-      loading: true,
-      firebaseError: null,
-    };
-  }
-
   const setList = useCallback(
     (nextList) => {
       const newList = typeof nextList === "function" ? nextList(list) : nextList;
@@ -110,6 +101,14 @@ function useGroceryListFirestore() {
     };
   }, [mounted]);
 
+  if (!mounted) {
+    return {
+      list: [],
+      setList: noop,
+      loading: true,
+      firebaseError: null,
+    };
+  }
   return { list, setList, loading, firebaseError };
 }
 
