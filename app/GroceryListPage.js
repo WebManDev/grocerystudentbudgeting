@@ -5,7 +5,7 @@ import { useGroceryListFirestore } from "./hooks/useGroceryListFirestore";
 import { useAuth } from "./contexts/AuthContext";
 import { calculateBasketTotals } from "./lib/cheapestBasket";
 import { dummyPriceDatabase } from "./data/dummyPrices";
-import DishRecommender from "./components/DishRecommender"; // ← tu import
+import DishRecommender from "./components/DishRecommender";
 
 export default function GroceryListPage() {
   const { user, authLoading } = useAuth();
@@ -13,7 +13,6 @@ export default function GroceryListPage() {
 
   const basketResult = list.length > 0 ? calculateBasketTotals(list, dummyPriceDatabase) : null;
 
-  // ← tu función
   function handleAddFromAI(newIngredients) {
     setList((prev) => {
       const updated = [...prev];
@@ -47,7 +46,6 @@ export default function GroceryListPage() {
             </div>
           )}
 
-          {/* ← tu componente */}
           <DishRecommender groceryList={list} onAddIngredients={handleAddFromAI} />
 
           <GroceryListBuilder list={list} onListChange={setList} />
