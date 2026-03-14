@@ -30,11 +30,15 @@ export function normalizeItemName(name) {
  */
 export function calculateBasketTotals(list, pricesByItem) {
   const totalsByStore = {};
+  const itemCountByStore = {}; // track how many items each store has prices for
   const missingItems = [];
 
   if (!list || list.length === 0) {
     return { totalsByStore: {}, bestStore: null, bestTotal: 0, missingItems: [] };
   }
+
+  // Count items that have at least one store price (used for completeness check)
+  let itemsWithAnyPrice = 0;
 
   for (const item of list) {
     const key = normalizeItemName(item.name);
@@ -46,21 +50,43 @@ export function calculateBasketTotals(list, pricesByItem) {
       continue;
     }
 
+    let itemHadAnyPrice = false;
     for (const [storeId, price] of Object.entries(storePrices)) {
+      // Skip null/undefined/zero — missing data must not count as $0
+      if (price == null || price === 0) continue;
       const cost = Number(price) * qty;
-      if (!Number.isFinite(cost)) continue;
+      if (!Number.isFinite(cost) || cost <= 0) continue;
       totalsByStore[storeId] = (totalsByStore[storeId] ?? 0) + cost;
+      itemCountByStore[storeId] = (itemCountByStore[storeId] ?? 0) + 1;
+      itemHadAnyPrice = true;
+    }
+    if (itemHadAnyPrice) itemsWithAnyPrice++;
+  }
+
+  // Only consider stores that have prices for ALL items that have any price data.
+  // This prevents a store with 2/5 items appearing cheaper than one with 5/5.
+  let bestStore = null;
+  let bestTotal = Infinity;
+  for (const [storeId, total] of Object.entries(totalsByStore)) {
+    const t = Number(total);
+    const coverage = itemCountByStore[storeId] ?? 0;
+    // Must cover all items that have price data to be eligible for "best"
+    if (Number.isFinite(t) && t < bestTotal && coverage >= itemsWithAnyPrice) {
+      bestTotal = t;
+      bestStore = storeId;
     }
   }
 
-  let bestStore = null;
-  let bestTotal = Infinity;
-
-  for (const [storeId, total] of Object.entries(totalsByStore)) {
-    const t = Number(total);
-    if (Number.isFinite(t) && t < bestTotal) {
-      bestTotal = t;
-      bestStore = storeId;
+  // If no store has full coverage, fall back to highest-coverage store
+  if (!bestStore && Object.keys(totalsByStore).length > 0) {
+    const maxCoverage = Math.max(...Object.values(itemCountByStore));
+    for (const [storeId, total] of Object.entries(totalsByStore)) {
+      const t = Number(total);
+      const coverage = itemCountByStore[storeId] ?? 0;
+      if (coverage === maxCoverage && Number.isFinite(t) && t < bestTotal) {
+        bestTotal = t;
+        bestStore = storeId;
+      }
     }
   }
 
