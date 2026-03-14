@@ -128,8 +128,13 @@ async function searchWoolworths(searchTerm) {
         const slug = p.UrlFriendlyName ?? p.urlFriendlyName ?? null;
         const stockcode = p.Stockcode ?? p.stockcode ?? "";
         if (typeof price === "number" && price > 0) {
+          const baseName = p.Name ?? p.name ?? "";
+          const packageSize = p.PackageSize ?? p.packageSize ?? "";
+          const fullName = packageSize && !baseName.toLowerCase().includes(packageSize.toLowerCase())
+            ? `${baseName} ${packageSize}`
+            : baseName;
           candidates.push({
-            name: p.Name ?? p.name ?? "",
+            name: fullName,
             price,
             categories: [],
             url: slug
@@ -143,8 +148,13 @@ async function searchWoolworths(searchTerm) {
       const slug = entry.UrlFriendlyName ?? entry.urlFriendlyName ?? null;
       const stockcode = entry.Stockcode ?? entry.stockcode ?? "";
       if (typeof price === "number" && price > 0) {
+        const baseName = entry.Name ?? entry.name ?? "";
+        const packageSize = entry.PackageSize ?? entry.packageSize ?? "";
+        const fullName = packageSize && !baseName.toLowerCase().includes(packageSize.toLowerCase())
+          ? `${baseName} ${packageSize}`
+          : baseName;
         candidates.push({
-          name: entry.Name ?? entry.name ?? "",
+          name: fullName,
           price,
           categories: [],
           url: slug
