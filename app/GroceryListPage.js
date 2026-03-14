@@ -7,6 +7,10 @@ import { calculateBasketTotals } from "./lib/cheapestBasket";
 import { dummyPriceDatabase } from "./data/dummyPrices";
 import DishRecommender from "./components/DishRecommender";
 
+function generateId() {
+  return String(Date.now()) + Math.random().toString(36).slice(2, 6);
+}
+
 export default function GroceryListPage() {
   const { user, authLoading } = useAuth();
   const { list, setList, loading, firebaseError } = useGroceryListFirestore(user);
@@ -15,15 +19,15 @@ export default function GroceryListPage() {
 
   function handleAddFromAI(newIngredients) {
     setList((prev) => {
-      const updated = [...prev];
+      const updated = prev.map((item) => ({ ...item }));
       newIngredients.forEach((ing) => {
         const exists = updated.find(
           (item) => item.name.toLowerCase() === ing.name.toLowerCase()
         );
         if (exists) {
-          exists.quantity = (exists.quantity || 1) + (ing.quantity || 1);
+          exists.quantity = Math.min(20, (exists.quantity || 1) + 1);
         } else {
-          updated.push({ name: ing.name, quantity: ing.quantity, unit: ing.unit });
+          updated.push({ id: generateId(), name: ing.name, quantity: 1 });
         }
       });
       return updated;

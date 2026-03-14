@@ -1,12 +1,87 @@
 "use client";
 import { useState } from "react";
 
-// COMMON DISHES for autocomplete suggestions
 const DISH_SUGGESTIONS = [
   "Spaghetti Bolognese", "Chicken Fried Rice", "Beef Stir Fry",
   "Vegetable Curry", "Pasta Carbonara", "Chicken Soup",
   "Tacos", "Omelette", "Pancakes", "Greek Salad",
 ];
+
+// Instant cache for common dishes — avoids API call entirely
+const DISH_CACHE = {
+  "spaghetti bolognese": [
+    { name: "Pasta", quantity: 1, unit: "pack", budget_tip: "Home brand ~$1.20 at Aldi" },
+    { name: "Ground beef", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Tomatoes", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Onions", quantity: 1, unit: "unit", budget_tip: null },
+    { name: "Olive oil", quantity: 1, unit: "bottle", budget_tip: null },
+    { name: "Cheese", quantity: 1, unit: "pack", budget_tip: "Optional — skip to save" },
+  ],
+  "chicken fried rice": [
+    { name: "Rice", quantity: 1, unit: "pack", budget_tip: "Aldi rice is cheapest" },
+    { name: "Chicken", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Eggs", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Frozen vegetables", quantity: 1, unit: "bag", budget_tip: "Frozen is cheaper than fresh" },
+    { name: "Onions", quantity: 1, unit: "unit", budget_tip: null },
+  ],
+  "beef stir fry": [
+    { name: "Ground beef", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Broccoli", quantity: 1, unit: "head", budget_tip: null },
+    { name: "Carrots", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Onions", quantity: 1, unit: "unit", budget_tip: null },
+    { name: "Rice", quantity: 1, unit: "pack", budget_tip: "Serve over rice" },
+    { name: "Olive oil", quantity: 1, unit: "bottle", budget_tip: null },
+  ],
+  "vegetable curry": [
+    { name: "Potatoes", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Carrots", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Onions", quantity: 1, unit: "unit", budget_tip: null },
+    { name: "Tomatoes", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Spinach", quantity: 1, unit: "bag", budget_tip: null },
+    { name: "Rice", quantity: 1, unit: "pack", budget_tip: "Serve over rice" },
+  ],
+  "pasta carbonara": [
+    { name: "Pasta", quantity: 1, unit: "pack", budget_tip: "Home brand ~$1.20" },
+    { name: "Eggs", quantity: 3, unit: "units", budget_tip: null },
+    { name: "Cheese", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Butter", quantity: 1, unit: "pack", budget_tip: null },
+  ],
+  "chicken soup": [
+    { name: "Chicken", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Carrots", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Potatoes", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Onions", quantity: 1, unit: "unit", budget_tip: null },
+    { name: "Spinach", quantity: 1, unit: "bag", budget_tip: null },
+  ],
+  "tacos": [
+    { name: "Ground beef", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Tomatoes", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Lettuce", quantity: 1, unit: "head", budget_tip: null },
+    { name: "Cheese", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Onions", quantity: 1, unit: "unit", budget_tip: null },
+  ],
+  "omelette": [
+    { name: "Eggs", quantity: 3, unit: "units", budget_tip: "Cheapest protein per serve" },
+    { name: "Cheese", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Butter", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Spinach", quantity: 1, unit: "bag", budget_tip: null },
+    { name: "Tomatoes", quantity: 1, unit: "unit", budget_tip: null },
+  ],
+  "pancakes": [
+    { name: "Flour", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Eggs", quantity: 2, unit: "units", budget_tip: null },
+    { name: "Milk", quantity: 1, unit: "bottle", budget_tip: null },
+    { name: "Butter", quantity: 1, unit: "pack", budget_tip: null },
+    { name: "Sugar", quantity: 1, unit: "pack", budget_tip: null },
+  ],
+  "greek salad": [
+    { name: "Tomatoes", quantity: 3, unit: "units", budget_tip: null },
+    { name: "Lettuce", quantity: 1, unit: "head", budget_tip: null },
+    { name: "Cheese", quantity: 1, unit: "pack", budget_tip: "Use feta if available" },
+    { name: "Onions", quantity: 1, unit: "unit", budget_tip: null },
+    { name: "Olive oil", quantity: 1, unit: "bottle", budget_tip: null },
+  ],
+};
 
 export default function DishRecommender({ groceryList = [], onAddIngredients }) {
   const [dish, setDish] = useState("");
@@ -33,11 +108,20 @@ export default function DishRecommender({ groceryList = [], onAddIngredients }) 
 
   async function handleRecommend() {
     if (!dish.trim()) return;
-    setLoading(true);
     setError(null);
     setResults(null);
     setSuggestions([]);
 
+    // Instant cache hit — no API call needed
+    const cacheKey = dish.trim().toLowerCase();
+    if (DISH_CACHE[cacheKey]) {
+      const ingredients = DISH_CACHE[cacheKey];
+      setResults(ingredients);
+      setSelected(new Set(ingredients.map((_, i) => i)));
+      return;
+    }
+
+    setLoading(true);
     try {
       const res = await fetch("/api/recommend", {
         method: "POST",
@@ -47,7 +131,6 @@ export default function DishRecommender({ groceryList = [], onAddIngredients }) 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setResults(data.ingredients);
-      // Pre-select all by default
       setSelected(new Set(data.ingredients.map((_, i) => i)));
     } catch (err) {
       setError(err.message);
