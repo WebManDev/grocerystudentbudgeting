@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AppNav } from "../components/AppNav";
 import {
   dummyPriceDatabase,
@@ -7,17 +8,8 @@ import {
   getCheapestStore,
   STORES,
 } from "../data/dummyPrices";
-
-// Demo list for this page (matches feature list example). Later: pass real list from Grocery List Builder.
-const DEMO_GROCERY_LIST = [
-  { id: "1", name: "Milk", quantity: 1 },
-  { id: "2", name: "Bread", quantity: 1 },
-  { id: "3", name: "Eggs", quantity: 1 },
-  { id: "4", name: "Chicken", quantity: 1 },
-  { id: "5", name: "Rice", quantity: 1 },
-  { id: "6", name: "Pasta", quantity: 1 },
-  { id: "7", name: "Cheese", quantity: 1 },
-];
+import { useGroceryListFirestore } from "../hooks/useGroceryListFirestore";
+import { calculateBasketTotals } from "../lib/cheapestBasket";
 
 const STORE_LABELS = {
   aldi: "Aldi",
@@ -31,9 +23,10 @@ function formatPrice(value) {
 
 export default function StorePricesPage() {
   const year = new Date().getFullYear();
+  const { list, loading } = useGroceryListFirestore();
+  const basketResult = list.length > 0 ? calculateBasketTotals(list, dummyPriceDatabase) : null;
 
-  // Build rows with prices and totals per store
-  const rows = DEMO_GROCERY_LIST.map((item) => {
+  const rows = list.map((item) => {
     const prices = getPrices(item.name);
     const aldiTotal = prices ? prices.aldi * item.quantity : null;
     const colesTotal = prices ? prices.coles * item.quantity : null;
@@ -49,20 +42,8 @@ export default function StorePricesPage() {
     };
   });
 
-  const totals = STORES.reduce(
-    (acc, store) => {
-      acc[store] = rows.reduce(
-        (sum, row) => sum + (row[`${store}Total`] ?? 0),
-        0
-      );
-      return acc;
-    },
-    { aldi: 0, coles: 0, woolworths: 0 }
-  );
-
-  const bestStore = Object.entries(totals).reduce((a, b) =>
-    a[1] <= b[1] ? a : b
-  )[0];
+  const totals = basketResult?.totalsByStore ?? { aldi: 0, coles: 0, woolworths: 0 };
+  const bestStore = basketResult?.bestStore ?? "aldi";
 
   return (
     <>
@@ -79,8 +60,17 @@ export default function StorePricesPage() {
           </div>
 
           <div className="hero-card p-4 mb-4">
+            {loading ? (
+              <p className="text-muted small mb-0">Loading your list…</p>
+            ) : list.length === 0 ? (
+              <div className="text-center py-3">
+                <p className="mb-2">Your list is empty.</p>
+                <Link href="/" className="btn btn-primary btn-sm" style={{ backgroundColor: "var(--ss-primary)", borderColor: "var(--ss-primary)" }}>Add items on Grocery List</Link>
+              </div>
+            ) : (
+            <>
             <p className="text-muted small mb-3">
-              Using a demo list. Later this will use your saved grocery list from the Grocery List page.
+              Your grocery list. Totals use the same algorithm as Budget and Home.
             </p>
             <div className="table-responsive">
               <table className="table table-hover align-middle mb-0">
@@ -153,8 +143,11 @@ export default function StorePricesPage() {
                 </tfoot>
               </table>
             </div>
+            </>
+            )}
           </div>
 
+          {list.length > 0 && (
           <div className="hero-card p-4">
             <h5 className="mb-2">Summary</h5>
             <ul className="list-unstyled mb-0 text-muted small">
@@ -172,6 +165,7 @@ export default function StorePricesPage() {
               </li>
             </ul>
           </div>
+          )}
 
           <div className="mt-4 p-3 rounded-3 bg-light border">
             <h6 className="mb-2">Real data later</h6>
