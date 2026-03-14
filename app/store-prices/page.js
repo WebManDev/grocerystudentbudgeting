@@ -302,7 +302,7 @@ export default function StorePricesPage() {
             </div>
           )}
 
-          <div className="mt-4 p-3 rounded-3 bg-light border">
+          {/* <div className="mt-4 p-3 rounded-3 bg-light border">
             <h6 className="mb-2">How prices are fetched</h6>
             <p className="small text-muted mb-0">
               Woolworths and Aldi are fetched server-side. Coles is fetched via
@@ -312,7 +312,7 @@ export default function StorePricesPage() {
               any price to view the product listing. If no match is found, that
               cell shows N/A.
             </p>
-          </div>
+          </div> */}
         </div>
       </main>
 
