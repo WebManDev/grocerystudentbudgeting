@@ -2,14 +2,20 @@
 
 import { GroceryListBuilder } from "./components/GroceryListBuilder";
 import { useGroceryListFirestore } from "./hooks/useGroceryListFirestore";
+import { useAuth } from "./contexts/AuthContext";
 
 export default function GroceryListPage() {
-  const { list, setList, loading, firebaseError } = useGroceryListFirestore();
+  const { user, authLoading } = useAuth();
+  const { list, setList, loading, firebaseError } = useGroceryListFirestore(user);
 
   return (
     <>
-      {loading ? (
+      {authLoading || loading ? (
         <p className="text-muted">Loading your list…</p>
+      ) : !user ? (
+        <p className="text-muted mb-0">
+          Sign in to create and save your grocery list.
+        </p>
       ) : (
         <>
           {firebaseError && (

@@ -64,11 +64,7 @@ export function GroceryListBuilder({ list, onListChange }) {
 
   function updateQuantity(id, newQty) {
     const qty = Math.max(1, Math.min(999, Number(newQty) || 1));
-    onListChange(
-      list.map((item) =>
-        item.id === id ? { ...item, quantity: qty } : item
-      )
-    );
+    onListChange(list.map((item) => item.id === id ? { ...item, quantity: qty } : item));
   }
 
   function handleKeyDown(e) {
@@ -78,16 +74,12 @@ export function GroceryListBuilder({ list, onListChange }) {
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightedIndex((i) =>
-        i < filteredSuggestions.length - 1 ? i + 1 : 0
-      );
+      setHighlightedIndex((i) => i < filteredSuggestions.length - 1 ? i + 1 : 0);
       return;
     }
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightedIndex((i) =>
-        i > 0 ? i - 1 : filteredSuggestions.length - 1
-      );
+      setHighlightedIndex((i) => i > 0 ? i - 1 : filteredSuggestions.length - 1);
       return;
     }
     if (e.key === "Enter") {
@@ -103,30 +95,29 @@ export function GroceryListBuilder({ list, onListChange }) {
   }
 
   return (
-    <div className="grocery-builder">
+    <div>
+      {/* Page heading */}
       <div className="mb-4">
-        <h1 className="hero-title mb-2">
-          Your <span className="hero-highlight">grocery list</span>
+        <h1 className="ss-page-title mb-1">
+          Your <span className="ss-highlight">grocery list</span>
         </h1>
-        <p className="hero-subtitle mb-0">
-          Add items and quantities. This list can be passed to the pricing engine.
-        </p>
+        <p className="ss-page-sub">Add items and quantities. We'll find the best prices for you.</p>
       </div>
 
       <div className="row g-4">
+        {/* Add item card */}
         <div className="col-lg-6">
-          <div className="hero-card p-4">
-            <h5 className="mb-3">Add item</h5>
-            <div className="position-relative mb-3">
-              <label htmlFor="grocery-item" className="form-label small text-muted">
-                Item name
-              </label>
+          <div className="ss-card h-100">
+            <p className="ss-card-title">Add item</p>
+
+            <div className="position-relative ss-field">
+              <label htmlFor="grocery-item" className="ss-label">Item name</label>
               <input
                 ref={inputRef}
                 type="text"
                 id="grocery-item"
-                className="form-control form-control-lg"
-                placeholder="e.g. Milk, Bread, Eggs"
+                className="ss-input"
+                placeholder="e.g. Milk, Bread, Eggs…"
                 value={itemName}
                 onChange={(e) => {
                   setItemName(e.target.value);
@@ -135,27 +126,16 @@ export function GroceryListBuilder({ list, onListChange }) {
                 }}
                 onFocus={() => setSuggestionsOpen(true)}
                 onKeyDown={handleKeyDown}
-                list="grocery-suggestions"
                 autoComplete="off"
               />
-              <datalist id="grocery-suggestions">
-                {COMMON_GROCERIES.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
               {suggestionsOpen && filteredSuggestions.length > 0 && (
-                <ul
-                  ref={suggestionsRef}
-                  className="list-group position-absolute w-100 mt-1 shadow-sm"
-                  style={{ zIndex: 10, maxHeight: "220px", overflowY: "auto" }}
-                >
+                <ul ref={suggestionsRef} className="ss-suggestions" role="listbox">
                   {filteredSuggestions.map((name, i) => (
                     <li
                       key={name}
-                      className={`list-group-item list-group-item-action ${
-                        i === highlightedIndex ? "active" : ""
-                      }`}
-                      style={{ cursor: "pointer" }}
+                      role="option"
+                      aria-selected={i === highlightedIndex}
+                      className={`ss-suggestion-item${i === highlightedIndex ? " highlighted" : ""}`}
                       onMouseEnter={() => setHighlightedIndex(i)}
                       onClick={() => addItem(name)}
                     >
@@ -165,102 +145,101 @@ export function GroceryListBuilder({ list, onListChange }) {
                 </ul>
               )}
             </div>
-            <div className="mb-3">
-              <label htmlFor="grocery-qty" className="form-label small text-muted">
-                Quantity
-              </label>
-              <div className="d-flex align-items-center gap-2">
+
+            <div className="ss-field">
+              <label htmlFor="grocery-qty" className="ss-label">Quantity</label>
+              <div className="d-flex gap-2">
                 <select
                   id="grocery-qty"
-                  className="form-select form-select-lg"
-                  style={{ width: "100px" }}
+                  className="ss-select"
+                  style={{ width: "90px", flexShrink: 0 }}
                   value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
                 >
                   {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
+                    <option key={n} value={n}>{n}</option>
                   ))}
                 </select>
                 <button
                   type="button"
-                  className="btn btn-primary btn-lg flex-grow-1"
-                  style={{
-                    backgroundColor: "var(--ss-primary)",
-                    borderColor: "var(--ss-primary)",
-                  }}
+                  className="btn-ss-primary"
+                  style={{ flex: 1, justifyContent: "center" }}
                   onClick={() => addItem()}
                 >
-                  Add to list
+                  + Add to list
                 </button>
               </div>
             </div>
           </div>
         </div>
 
+        {/* Output preview card */}
         <div className="col-lg-6">
-          <div className="hero-card p-4">
-            <h5 className="mb-3">Output (for pricing engine)</h5>
-            <div
-              className="border rounded-3 p-3 bg-light"
-              style={{ minHeight: "120px" }}
-            >
+          <div className="ss-card h-100">
+            <p className="ss-card-title">Preview (for pricing engine)</p>
+            <div className="ss-output-box">
               {list.length === 0 ? (
-                <p className="text-muted small mb-0">
-                  Your list will appear here as: <code>Item x1</code>, <code>Item x2</code>, etc.
-                </p>
+                <span style={{ opacity: 0.5 }}>
+                  Your list will appear here as: <code>Milk x1</code>, <code>Eggs x2</code>…
+                </span>
               ) : (
-                <ul className="list-unstyled mb-0">
-                  {list.map((item) => (
-                    <li key={item.id} className="mb-1 font-monospace">
-                      {item.name} x{item.quantity}
-                    </li>
-                  ))}
-                </ul>
+                list.map((item) => (
+                  <div key={item.id} className="ss-output-item">
+                    {item.name} x{item.quantity}
+                  </div>
+                ))
               )}
             </div>
           </div>
         </div>
       </div>
 
+      {/* Full list */}
       {list.length > 0 && (
-        <div className="hero-card p-4 mt-4">
-          <h5 className="mb-3">Your list</h5>
-          <ul className="list-group list-group-flush">
+        <div className="ss-card mt-4">
+          <div className="d-flex align-items-center justify-content-between mb-3">
+            <p className="ss-card-title mb-0">Your items</p>
+            <span
+              style={{
+                fontSize: "0.78rem",
+                fontWeight: 600,
+                color: "var(--ss-primary)",
+                background: "var(--ss-primary-soft)",
+                borderRadius: "999px",
+                padding: "0.2rem 0.65rem",
+              }}
+            >
+              {list.length} item{list.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div>
             {list.map((item) => (
-              <li
-                key={item.id}
-                className="list-group-item d-flex align-items-center justify-content-between px-0"
-              >
-                <div className="d-flex align-items-center gap-3 flex-grow-1">
-                  <span className="fw-semibold">{item.name}</span>
+              <div key={item.id} className="ss-list-item">
+                <span className="ss-item-name">{item.name}</span>
+                <div className="d-flex align-items-center gap-2">
                   <select
-                    className="form-select form-select-sm"
-                    style={{ width: "70px" }}
+                    className="ss-select sm"
+                    style={{ width: "72px" }}
                     value={item.quantity}
-                    onChange={(e) =>
-                      updateQuantity(item.id, Number(e.target.value))
-                    }
+                    onChange={(e) => updateQuantity(item.id, Number(e.target.value))}
+                    aria-label={`Quantity for ${item.name}`}
                   >
                     {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
+                      <option key={n} value={n}>{n}</option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="btn-ss-danger"
+                    aria-label={`Remove ${item.name}`}
+                    onClick={() => removeItem(item.id)}
+                  >
+                    Remove
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn-outline-danger btn-sm"
-                  aria-label={`Remove ${item.name}`}
-                  onClick={() => removeItem(item.id)}
-                >
-                  Remove
-                </button>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
     </div>

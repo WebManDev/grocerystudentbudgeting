@@ -11,11 +11,14 @@ The app is intended to be hosted on Vercel. Next.js is a first‑class framework
 
 ### Current status
 
-- **Implemented**: **Grocery List Builder** — add/remove items, quantity selection, and optional search/autocomplete. Output format: `Milk x1`, `Bread x1`, etc. List state is owned by the page and ready to be passed to a pricing engine.
+- **Implemented**:
+  - **Firebase Authentication** (email/password sign up, sign in, sign out)
+  - **Grocery List Builder** — add/remove items, quantity selection, and optional search/autocomplete
+  - **Firestore persistence** per signed-in user
 - **Not implemented yet**:
   - Pricing engine (consumes the grocery list)
-  - User authentication
-  - Budget tracking and data storage (Firebase)
+  - Production pricing data integration
+  - Advanced budget analytics
 
 ### Local development
 
@@ -38,7 +41,7 @@ The app is intended to be hosted on Vercel. Next.js is a first‑class framework
 1. Push this repo to GitHub, GitLab, or Bitbucket.
 2. Create a project on Vercel and import the repo.
 3. Vercel will auto-detect **Next.js** and use `npm run build` as the build command and `next start` as the default.
-4. No environment variables or Firebase configuration are required for the Grocery List Builder.
+4. Configure Firebase Authentication + Firestore before first deployment.
 
 ### Grocery List Builder
 
@@ -50,9 +53,8 @@ The app is intended to be hosted on Vercel. Next.js is a first‑class framework
 
 ### Firebase persistence
 
-The grocery list is saved to **Firestore** per user (anonymous auth), so it survives refresh and is available across sessions.
+The grocery list is saved to **Firestore** per signed-in user, so it survives refresh and is available across sessions.
 
-1. **Firebase Console**: Create a Firestore database (if you haven’t), and enable **Anonymous** sign-in under Authentication → Sign-in method.
-2. **Security rules**: Deploy the rules in `firestore.rules` so each user can read/write only their own `groceryLists/{userId}` document (e.g. `firebase deploy --only firestore:rules` if using Firebase CLI).
-3. If Firestore or Anonymous auth isn’t set up, the app still works: the list is kept in memory and a warning is shown that it’s “saved locally only”.
-
+1. **Firebase Console**: Create a Firestore database and enable **Email/Password** sign-in under Authentication → Sign-in method.
+2. **Security rules**: Deploy `firestore.rules` so each user can read/write only their own `groceryLists/{userId}` document (e.g. `firebase deploy --only firestore:rules`).
+3. If Anonymous auth was previously enabled, disable it unless you intentionally need guest sessions.

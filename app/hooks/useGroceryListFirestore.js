@@ -7,22 +7,14 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { signInAnonymously } from "firebase/auth";
-import { db, auth } from "../../firebase/firebase";
+import { db } from "../../firebase/firebase";
 
 const COLLECTION = "groceryLists";
 
-const noop = () => {};
-
-function useGroceryListFirestore() {
+function useGroceryListFirestore(user) {
   const [list, setListState] = useState([]);
   const [loading, setLoading] = useState(true);
   const [firebaseError, setFirebaseError] = useState(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const writeList = useCallback(async (uid, newList) => {
     try {
@@ -40,30 +32,33 @@ function useGroceryListFirestore() {
 
   const setList = useCallback(
     (nextList) => {
-      const newList = typeof nextList === "function" ? nextList(list) : nextList;
-      setListState(newList);
-      const user = auth.currentUser;
-      if (user) {
-        writeList(user.uid, newList);
-      }
+      setListState((prevList) => {
+        const newList =
+          typeof nextList === "function" ? nextList(prevList) : nextList;
+
+        if (user?.uid) {
+          writeList(user.uid, newList);
+        }
+        return newList;
+      });
     },
-    [list, writeList]
+    [user, writeList]
   );
 
   useEffect(() => {
-    if (!mounted) return;
     let cancelled = false;
 
-    async function init() {
+    async function loadList() {
+      if (!user?.uid) {
+        setListState([]);
+        setFirebaseError(null);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       try {
-        const user = auth.currentUser;
-        const uid = user
-          ? user.uid
-          : (await signInAnonymously(auth)).user.uid;
-
-        if (cancelled) return;
-
-        const ref = doc(db, COLLECTION, uid);
+        const ref = doc(db, COLLECTION, user.uid);
         const snap = await getDoc(ref);
 
         if (cancelled) return;
@@ -82,33 +77,13 @@ function useGroceryListFirestore() {
       }
     }
 
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        init();
-      } else {
-        signInAnonymously(auth).catch((err) => {
-          if (!cancelled) {
-            setFirebaseError(err.message || "Auth failed");
-            setLoading(false);
-          }
-        });
-      }
-    });
+    loadList();
 
     return () => {
       cancelled = true;
-      unsubscribe();
     };
-  }, [mounted]);
+  }, [user]);
 
-  if (!mounted) {
-    return {
-      list: [],
-      setList: noop,
-      loading: true,
-      firebaseError: null,
-    };
-  }
   return { list, setList, loading, firebaseError };
 }
 
