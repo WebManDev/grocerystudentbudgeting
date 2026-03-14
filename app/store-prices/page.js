@@ -10,152 +10,9 @@ import { useAuth } from "../contexts/AuthContext";
 const STORE_LABELS = { aldi: "Aldi", coles: "Coles", woolworths: "Woolworths" };
 const STORES = ["aldi", "coles", "woolworths"];
 
-// ─── Normalisation (client-side, mirrors route.js) ───────────────────────────
-
-function extractQuantity(name) {
-  const match = name.match(/(\d+(\.\d+)?)\s*(ml|l|g|kg|pk|pack|sheets?|rolls?)/i);
-  if (!match) return null;
-  return { value: parseFloat(match[1]), unit: match[3].toLowerCase() };
-}
-
-function toBaseUnit(value, unit) {
-  switch (unit) {
-    case "ml":     return { value: value / 1000, unit: "l" };
-    case "l":      return { value, unit: "l" };
-    case "g":      return { value: value / 1000, unit: "kg" };
-    case "kg":     return { value, unit: "kg" };
-    case "sheet":
-    case "sheets": return { value: value / 100, unit: "100 sheets" };
-    default:       return { value, unit };
-  }
-}
-
-function getNormalisedPrice(price, productName) {
-  const raw = extractQuantity(productName);
-  if (!raw) return null;
-  const base = toBaseUnit(raw.value, raw.unit);
-  if (base.value === 0) return null;
-  return { normalisedPrice: price / base.value, unit: base.unit };
-}
-
-const REJECT_KEYWORDS = [
-  "frother", "maker", "machine", "appliance", "grinder", "blender",
-  "chocolate", "syrup", "supplement", "protein", "candle", "soap",
-  "detergent", "cleaner", "bleach", "bag", "wrap", "foil", "sponge", "brush",
-];
-const REJECT_CATEGORIES = [
-  "tea, coffee", "kitchenware", "appliance", "cleaning",
-  "electronics", "clothing", "toys", "garden", "tools",
-];
-const VAGUE_UNITS = ["each", "ea", "1each", "per each"];
-
-function isRelevantProduct(name, categories, query) {
-  const lname = name.toLowerCase();
-  if (!lname.includes(query.toLowerCase())) return false;
-  if (REJECT_KEYWORDS.some((kw) => lname.includes(kw))) return false;
-  if (categories?.length) {
-    const catStr = categories.map((c) => (c.name || c).toLowerCase()).join(" ");
-    if (REJECT_CATEGORIES.some((rc) => catStr.includes(rc))) return false;
-  }
-  return true;
-}
-
-function scoreCandidate(p) {
-  const norm = getNormalisedPrice(p.price, p.name);
-  const isVague = !norm || VAGUE_UNITS.some((u) => p.name.toLowerCase().includes(u));
-  const base = norm ? norm.normalisedPrice : p.price * 10;
-  return isVague ? base + 10000 : base;
-}
-
-function pickBestProduct(candidates, query) {
-  const relevant = candidates.filter((p) =>
-    isRelevantProduct(p.name, p.categories ?? [], query)
-  );
-  const pool = relevant.length > 0 ? relevant : candidates;
-  let best = null, bestScore = Infinity;
-  for (const p of pool) {
-    const score = scoreCandidate(p);
-    if (score < bestScore) { bestScore = score; best = p; }
-  }
-  return best;
-}
-
-function buildResult(best, price) {
-  if (!best) return null;
-  const norm = getNormalisedPrice(price ?? best.price, best.name);
-  return {
-    price: price ?? best.price,
-    normalisedPrice: norm?.normalisedPrice ?? null,
-    normalisedUnit: norm?.unit ?? null,
-    productName: best.name,
-    url: best.url ?? null,
-  };
-}
-
-// ─── Coles client-side fetch ──────────────────────────────────────────────────
-
-let colesBuildIdCache = null;
-let colesBuildIdCachedAt = null;
-const COLES_CACHE_TTL = 60 * 60 * 1000;
-
-async function getColesBuildId() {
-  const now = Date.now();
-  if (colesBuildIdCache && colesBuildIdCachedAt && (now - colesBuildIdCachedAt) < COLES_CACHE_TTL) {
-    return colesBuildIdCache;
-  }
-  // Fetch the Coles homepage to extract the Next.js buildId
-  const res = await fetch("https://www.coles.com.au", {
-    headers: { Accept: "text/html" },
-    credentials: "omit",
-  });
-  const html = await res.text();
-  const match = html.match(/"buildId"\s*:\s*"([^"]+)"/);
-  if (match) {
-    colesBuildIdCache = match[1];
-    colesBuildIdCachedAt = now;
-    return colesBuildIdCache;
-  }
-  return null;
-}
-
-async function searchColesClient(searchTerm) {
-  try {
-    const buildId = await getColesBuildId();
-    if (!buildId) return null;
-
-    const url = `https://www.coles.com.au/_next/data/${buildId}/en/search/products.json?q=${encodeURIComponent(searchTerm)}`;
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-      credentials: "omit",
-    });
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    const results = data?.pageProps?.searchResults?.results;
-    if (!Array.isArray(results) || results.length === 0) return null;
-
-    const candidates = results
-      .map((r) => ({
-        name: r.name ?? r.Name ?? "",
-        price: r?.pricing?.now ?? r?.Price?.now ?? r?.price ?? null,
-        categories: r.category ? [{ name: r.category }] : [],
-        url: r.slug ? `https://www.coles.com.au/product/${r.slug}` : null,
-      }))
-      .filter((c) => typeof c.price === "number" && c.price > 0);
-
-    if (candidates.length === 0) return null;
-    const best = pickBestProduct(candidates, searchTerm);
-    return buildResult(best, best?.price ?? null);
-  } catch (e) {
-    console.warn("Coles client fetch failed:", e.message);
-    return null;
-  }
-}
-
 // ─── Formatting helpers ───────────────────────────────────────────────────────
 
 function formatNormalisedAsStandard(normalisedPrice, normalisedUnit) {
-  // normalisedPrice is already per base unit (per kg, per l, per 100 sheets, per pack)
   if (normalisedPrice == null || normalisedUnit == null) return null;
   return `$${Number(normalisedPrice).toFixed(2)}/${normalisedUnit}`;
 }
@@ -172,8 +29,6 @@ function flattenForBasket(livePricesByItem) {
     out[item] = {};
     for (const store of STORES) {
       const price = stores[store]?.price;
-      // Only include stores with a real price — null/undefined causes
-      // calculateBasketTotals to treat them as 0 which skews totals
       if (typeof price === "number" && price > 0) {
         out[item][store] = price;
       }
@@ -196,25 +51,21 @@ function getStorePrices(itemName, livePricesByItem) {
   };
 }
 
-// ─── PriceCell component ──────────────────────────────────────────────────────
+// ─── PriceCell ────────────────────────────────────────────────────────────────
 
 function PriceCell({ storeResult, quantity }) {
   if (!storeResult || storeResult.price == null) {
     return <span className="text-muted">N/A</span>;
   }
 
-  // Display the normalised price × quantity if available, else raw price × quantity
-  // const displayPrice = storeResult.normalisedPrice != null
-  //   ? storeResult.normalisedPrice * quantity
-  //   : storeResult.price * quantity;
-
-  const displayPrice = storeResult.price * quantity;
-
+  const actualTotal = storeResult.price * quantity;
   const normLabel = formatNormalisedAsStandard(storeResult.normalisedPrice, storeResult.normalisedUnit);
 
   const inner = (
     <span>
-      <span className="fw-semibold">{formatPrice(displayPrice)}</span>
+      <span className="fw-semibold" style={{ fontSize: "0.95rem" }}>
+        {formatPrice(actualTotal)}
+      </span>
       {normLabel && (
         <span className="d-block" style={{ fontSize: "0.72rem", color: "var(--ss-muted)" }}>
           {normLabel}
@@ -230,10 +81,16 @@ function PriceCell({ storeResult, quantity }) {
 
   if (storeResult.url) {
     return (
-      <a href={storeResult.url} target="_blank" rel="noopener noreferrer"
-        style={{ textDecoration: "none", color: "inherit" }}>
+      <a
+        href={storeResult.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ textDecoration: "none", color: "inherit" }}
+      >
         {inner}
-        <span style={{ fontSize: "0.68rem", color: "var(--ss-primary)", display: "block" }}>↗ view</span>
+        <span style={{ fontSize: "0.68rem", color: "var(--ss-primary)", display: "block" }}>
+          ↗ view
+        </span>
       </a>
     );
   }
@@ -258,7 +115,7 @@ export default function StorePricesPage() {
     setFetchLoading(true);
     setFetchError(null);
     try {
-      // Step 1: fetch Woolworths + Aldi server-side
+      // Step 1: Woolworths + Aldi server-side
       const res = await fetch("/api/prices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -272,15 +129,25 @@ export default function StorePricesPage() {
 
       const combined = data.pricesByItem || {};
 
-      // Step 2: fetch Coles client-side for each unique item
-      const terms = [...new Set(list.map((i) => (i.name || "").trim().toLowerCase()).filter(Boolean))];
+      // Step 2: Coles via server-side proxy (avoids CORS)
+      const terms = [
+        ...new Set(list.map((i) => (i.name || "").trim().toLowerCase()).filter(Boolean)),
+      ];
       await Promise.all(
         terms.map(async (term) => {
-          const colesResult = await searchColesClient(term);
-          if (combined[term]) {
-            combined[term].coles = colesResult;
-          } else {
-            combined[term] = { woolworths: null, coles: colesResult, aldi: null };
+          try {
+            const colesRes = await fetch(`/api/coles-proxy?q=${encodeURIComponent(term)}`);
+            if (colesRes.ok) {
+              const colesData = await colesRes.json();
+              const colesResult = colesData.result ?? null;
+              if (combined[term]) {
+                combined[term].coles = colesResult;
+              } else {
+                combined[term] = { woolworths: null, coles: colesResult, aldi: null };
+              }
+            }
+          } catch (e) {
+            console.warn("Coles proxy fetch failed for", term, e.message);
           }
         })
       );
@@ -342,11 +209,13 @@ export default function StorePricesPage() {
                       ? "Live prices shown — normalised to standard units. Click a price to view the product."
                       : "Sample prices shown. Click below to fetch live prices."}
                   </p>
-                  <button type="button"
+                  <button
+                    type="button"
                     className="btn btn-primary btn-sm"
                     style={{ backgroundColor: "var(--ss-primary)", borderColor: "var(--ss-primary)" }}
                     onClick={fetchLivePrices}
-                    disabled={fetchLoading}>
+                    disabled={fetchLoading}
+                  >
                     {fetchLoading ? "Fetching…" : "Fetch live prices"}
                   </button>
                 </div>
@@ -394,12 +263,13 @@ export default function StorePricesPage() {
                     <tfoot className="table-light">
                       <tr className="fw-bold">
                         <td colSpan={2}>Basket total</td>
-                        <td className="text-end">{totals.aldi  ? formatPrice(totals.aldi)  : "N/A"}</td>
-                        <td className="text-end">{totals.coles ? formatPrice(totals.coles) : "N/A"}</td>
+                        <td className="text-end">{totals.aldi       ? formatPrice(totals.aldi)       : "N/A"}</td>
+                        <td className="text-end">{totals.coles      ? formatPrice(totals.coles)      : "N/A"}</td>
                         <td className="text-end">{totals.woolworths ? formatPrice(totals.woolworths) : "N/A"}</td>
                         <td>
                           {bestStore
-                            ? <span className="badge rounded-pill" style={{ backgroundColor: "var(--ss-accent)", color: "#fff" }}>
+                            ? <span className="badge rounded-pill"
+                                style={{ backgroundColor: "var(--ss-accent)", color: "#fff" }}>
                                 Best: {STORE_LABELS[bestStore]}
                               </span>
                             : "N/A"}
@@ -435,11 +305,12 @@ export default function StorePricesPage() {
           <div className="mt-4 p-3 rounded-3 bg-light border">
             <h6 className="mb-2">How prices are fetched</h6>
             <p className="small text-muted mb-0">
-              Woolworths and Aldi are fetched server-side. Coles is fetched
-              directly from your browser to avoid bot-detection blocks. All
-              prices are normalised to standard units (per kg, per L, per 100
-              sheets) so the best-value product is always selected. Click any
-              price to view the listing. If no match is found, that cell shows N/A.
+              Woolworths and Aldi are fetched server-side. Coles is fetched via
+              a server-side proxy to avoid browser CORS restrictions. All prices
+              are normalised to standard units (per kg, per L, per 100 sheets)
+              — weight and volume always take priority over pack counts. Click
+              any price to view the product listing. If no match is found, that
+              cell shows N/A.
             </p>
           </div>
         </div>
@@ -447,8 +318,12 @@ export default function StorePricesPage() {
 
       <footer className="footer py-4">
         <div className="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
-          <span className="text-muted small">© <span>{year}</span> StudentSaver. All rights reserved.</span>
-          <span className="text-muted small">Prices fetched live from Aldi, Coles &amp; Woolworths.</span>
+          <span className="text-muted small">
+            © <span>{year}</span> StudentSaver. All rights reserved.
+          </span>
+          <span className="text-muted small">
+            Prices fetched live from Aldi, Coles &amp; Woolworths.
+          </span>
         </div>
       </footer>
     </>
