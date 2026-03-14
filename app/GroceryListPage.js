@@ -5,12 +5,31 @@ import { useGroceryListFirestore } from "./hooks/useGroceryListFirestore";
 import { useAuth } from "./contexts/AuthContext";
 import { calculateBasketTotals } from "./lib/cheapestBasket";
 import { dummyPriceDatabase } from "./data/dummyPrices";
+import DishRecommender from "./components/DishRecommender"; // ← tu import
 
 export default function GroceryListPage() {
   const { user, authLoading } = useAuth();
   const { list, setList, loading, firebaseError } = useGroceryListFirestore(user);
 
   const basketResult = list.length > 0 ? calculateBasketTotals(list, dummyPriceDatabase) : null;
+
+  // ← tu función
+  function handleAddFromAI(newIngredients) {
+    setList((prev) => {
+      const updated = [...prev];
+      newIngredients.forEach((ing) => {
+        const exists = updated.find(
+          (item) => item.name.toLowerCase() === ing.name.toLowerCase()
+        );
+        if (exists) {
+          exists.quantity = (exists.quantity || 1) + (ing.quantity || 1);
+        } else {
+          updated.push({ name: ing.name, quantity: ing.quantity, unit: ing.unit });
+        }
+      });
+      return updated;
+    });
+  }
 
   return (
     <>
@@ -27,6 +46,10 @@ export default function GroceryListPage() {
               <small>List is saved locally only: {firebaseError}</small>
             </div>
           )}
+
+          {/* ← tu componente */}
+          <DishRecommender groceryList={list} onAddIngredients={handleAddFromAI} />
+
           <GroceryListBuilder list={list} onListChange={setList} />
           {basketResult && (
             <div className="hero-card p-4 mt-4">
