@@ -17,7 +17,7 @@ const firebaseConfig = {
   appId: "1:888791190500:web:249f0cc2b7ec5b0d5415f1",
   measurementId: "G-WZVSEPVM66"
 };
-
+//
 // Initialize Firebase (only in browser to avoid SSR errors)
 const app = initializeApp(firebaseConfig);
 const analytics =
