@@ -58,8 +58,7 @@ Respond with ONLY the JSON array. No explanation, no markdown, no backticks.`;
 
       return NextResponse.json(
         {
-          error:
-            "AI provider returned an error. Please try again later or contact support.",
+          error: `OpenRouter ${response.status}: ${text.slice(0, 300)}`,
         },
         { status: 500 }
       );
