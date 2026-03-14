@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { GroceryListBuilder } from "./components/GroceryListBuilder";
+import dynamic from "next/dynamic";
+
+// Load Firestore-backed list only on client to avoid SSR "window is not defined"
+const GroceryListPage = dynamic(
+  () => import("./GroceryListPage"),
+  { ssr: false }
+);
 
 export default function HomePage() {
   const year = new Date().getFullYear();
-
-  // Owner: list state lives here so it can be passed to the pricing engine later.
-  const [list, setList] = useState([]);
 
   return (
     <>
@@ -52,7 +54,7 @@ export default function HomePage() {
 
       <main className="hero-section">
         <div className="container">
-          <GroceryListBuilder list={list} onListChange={setList} />
+          <GroceryListPage />
         </div>
       </main>
 

@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Each user can read/write only their own grocery list (doc id = auth.uid).
+    // Anonymous auth is used, so enable "Anonymous" sign-in in Firebase Console.
+    match /groceryLists/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

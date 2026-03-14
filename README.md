@@ -48,3 +48,11 @@ The app is intended to be hosted on Vercel. Next.js is a first‑class framework
 - **Output** is shown as `Item x1`, `Item x2`, etc., and is ready to be passed to a pricing engine.
 - **Owner responsibility**: The page owns the list state (`list` / `setList`) and passes it to `GroceryListBuilder`; the same list can be passed to a future pricing engine component.
 
+### Firebase persistence
+
+The grocery list is saved to **Firestore** per user (anonymous auth), so it survives refresh and is available across sessions.
+
+1. **Firebase Console**: Create a Firestore database (if you haven’t), and enable **Anonymous** sign-in under Authentication → Sign-in method.
+2. **Security rules**: Deploy the rules in `firestore.rules` so each user can read/write only their own `groceryLists/{userId}` document (e.g. `firebase deploy --only firestore:rules` if using Firebase CLI).
+3. If Firestore or Anonymous auth isn’t set up, the app still works: the list is kept in memory and a warning is shown that it’s “saved locally only”.
+
