@@ -4,6 +4,7 @@ import Link from "next/link";
 
 const NAV_LINKS = [
   { href: "/", label: "Grocery List" },
+  { href: "/budget", label: "Budget" },
   { href: "/store-prices", label: "Store Prices" },
 ];
 

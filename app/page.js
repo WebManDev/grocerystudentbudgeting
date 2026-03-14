@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { AppNav } from "./components/AppNav";
 
 // Load Firestore-backed list only on client to avoid SSR "window is not defined"
@@ -19,6 +20,18 @@ export default function HomePage() {
       <main className="hero-section">
         <div className="container">
           <GroceryListPage />
+          <div className="hero-card p-4 mt-4 text-center">
+            <Link
+              href="/budget"
+              className="btn btn-primary btn-lg"
+              style={{
+                backgroundColor: "var(--ss-primary)",
+                borderColor: "var(--ss-primary)",
+              }}
+            >
+              Finalise list & go to Budget
+            </Link>
+          </div>
         </div>
       </main>
 
