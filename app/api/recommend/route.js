@@ -26,50 +26,61 @@ Respond with ONLY the JSON array. No explanation, no markdown, no backticks.`;
         .join(", ")}. What else do I need?`
     : `I want to make: ${dish}. Give me the full ingredient list.`;
 
+  const FREE_MODELS = [
+    "nousresearch/hermes-3-llama-3.1-405b:free",
+    "meta-llama/llama-3.2-3b-instruct:free",
+  ];
+
   try {
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        },
-        body: JSON.stringify({
-          // Use a well-supported free model on OpenRouter
-          model: "meta-llama/llama-3.2-3b-instruct:free",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.3,
-        }),
-      }
-    );
+    let lastError = "";
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      console.error(
-        "OpenRouter error",
-        response.status,
-        response.statusText,
-        text
-      );
-
-      return NextResponse.json(
+    for (const model of FREE_MODELS) {
+      const response = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
         {
-          error: `OpenRouter ${response.status}: ${text.slice(0, 300)}`,
-        },
-        { status: 500 }
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            temperature: 0.3,
+          }),
+        }
       );
+
+      if (response.status === 429) {
+        lastError = `${model} is rate-limited`;
+        console.warn(lastError, "— trying next model");
+        continue;
+      }
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        console.error("OpenRouter error", response.status, text);
+        return NextResponse.json(
+          { error: `AI error (${response.status}). Try again shortly.` },
+          { status: 500 }
+        );
+      }
+
+      const data = await response.json();
+      const raw = data.choices[0].message.content.trim();
+      const clean = raw.replace(/```json|```/g, "").trim();
+      const ingredients = JSON.parse(clean);
+
+      return NextResponse.json({ ingredients });
     }
 
-    const data = await response.json();
-    const raw = data.choices[0].message.content.trim();
-    const clean = raw.replace(/```json|```/g, "").trim();
-    const ingredients = JSON.parse(clean);
-
-    return NextResponse.json({ ingredients });
+    return NextResponse.json(
+      { error: "All AI models are busy right now. Please try again in a minute." },
+      { status: 429 }
+    );
   } catch (error) {
     console.error("Error calling OpenRouter:", error);
     return NextResponse.json(
