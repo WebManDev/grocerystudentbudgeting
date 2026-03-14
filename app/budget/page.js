@@ -4,6 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AppNav } from "../components/AppNav";
 import { useGroceryListFirestore } from "../hooks/useGroceryListFirestore";
+import { calculateBasketTotals } from "../lib/cheapestBasket";
+import { dummyPriceDatabase } from "../data/dummyPrices";
+
+const STORE_LABELS = { aldi: "Aldi", coles: "Coles", woolworths: "Woolworths" };
 
 export default function BudgetPage() {
   const year = new Date().getFullYear();
@@ -11,7 +15,6 @@ export default function BudgetPage() {
   const [budget, setBudget] = useState("");
   const [mounted, setMounted] = useState(false);
 
-  // Persist budget in localStorage so it survives refresh
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -28,9 +31,15 @@ export default function BudgetPage() {
   }, [mounted, budget]);
 
   const budgetNum = parseFloat(String(budget).replace(/[^0-9.]/g, "")) || 0;
-  // Placeholder until Cheapest Basket Engine is connected
-  const basketTotal = null;
+  const basketResult = list.length > 0 ? calculateBasketTotals(list, dummyPriceDatabase) : null;
+  const basketTotal = basketResult?.bestTotal ?? null;
   const remaining = basketTotal != null && budgetNum > 0 ? budgetNum - basketTotal : null;
+  const mostExpensiveStore = basketResult?.totalsByStore
+    ? Object.entries(basketResult.totalsByStore).reduce((a, b) => (b[1] > a[1] ? b : a), ["", 0])[0]
+    : null;
+  const savingsVsWorst = basketTotal != null && mostExpensiveStore
+    ? (basketResult.totalsByStore[mostExpensiveStore] ?? 0) - basketTotal
+    : 0;
 
   return (
     <>
@@ -114,12 +123,26 @@ export default function BudgetPage() {
                     />
                   </div>
                 )}
-                <p className="small text-muted mt-2 mb-0">
-                  Basket total will appear here once the pricing engine is connected.
-                </p>
+                {basketResult?.bestStore && (
+                  <p className="small text-success mt-2 mb-0">
+                    Cheapest basket: <strong>{STORE_LABELS[basketResult.bestStore]}</strong> — ${basketTotal.toFixed(2)}
+                  </p>
+                )}
               </div>
             </div>
           </div>
+
+          {savingsVsWorst > 0 && mostExpensiveStore && basketResult?.bestStore && (
+            <div className="hero-card p-4 mt-4 border-success border-2">
+              <h5 className="mb-2">Savings &amp; insights</h5>
+              <p className="mb-1">
+                You save <strong className="text-success">${savingsVsWorst.toFixed(2)}</strong> by shopping at {STORE_LABELS[basketResult.bestStore]} instead of {STORE_LABELS[mostExpensiveStore]}.
+              </p>
+              <p className="text-muted small mb-0">
+                Budget: ${budgetNum.toFixed(2)} · Cheapest basket: ${basketTotal.toFixed(2)} · Remaining: ${remaining.toFixed(2)}
+              </p>
+            </div>
+          )}
 
           <div className="hero-card p-4 mt-4">
             <h5 className="mb-3">Your grocery list</h5>
