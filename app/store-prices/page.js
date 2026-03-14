@@ -59,6 +59,67 @@ export default function StorePricesPage() {
             </p>
           </div>
 
+          {/* Recommendation banner */}
+          {!loading && list.length > 0 && basketResult && (
+            <div
+              className="hero-card p-4 mb-4 border-2"
+              style={{ borderColor: "var(--ss-accent)", borderStyle: "solid", borderRadius: "1rem" }}
+            >
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: "50%",
+                    backgroundColor: "var(--ss-accent)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 26,
+                    flexShrink: 0,
+                  }}
+                >
+                  🏆
+                </div>
+                <div className="flex-grow-1">
+                  <h5 className="mb-1 fw-bold">
+                    Shop at <span style={{ color: "var(--ss-accent)" }}>{STORE_LABELS[bestStore]}</span> to save the most
+                  </h5>
+                  <p className="mb-0 text-muted small">
+                    Your cheapest basket is{" "}
+                    <strong className="text-dark">{formatPrice(totals[bestStore])}</strong>
+                    {(() => {
+                      const worstTotal = Math.max(...Object.values(totals).filter(Boolean));
+                      const savings = worstTotal - totals[bestStore];
+                      return savings > 0 ? (
+                        <> — you save <strong className="text-success">{formatPrice(savings)}</strong> vs the most expensive option</>
+                      ) : null;
+                    })()}
+                  </p>
+                </div>
+                <div className="d-flex gap-2 flex-wrap">
+                  {Object.entries(totals)
+                    .sort((a, b) => a[1] - b[1])
+                    .map(([store, total], i) => (
+                      <div
+                        key={store}
+                        className="text-center px-3 py-2 rounded-3"
+                        style={{
+                          backgroundColor: store === bestStore ? "var(--ss-accent)" : "#f1f3f5",
+                          color: store === bestStore ? "#fff" : "#555",
+                          minWidth: 90,
+                        }}
+                      >
+                        <div className="fw-bold small">{STORE_LABELS[store]}</div>
+                        <div className="fw-semibold">{formatPrice(total)}</div>
+                        {i === 0 && <div style={{ fontSize: 10 }}>CHEAPEST</div>}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="hero-card p-4 mb-4">
             {loading ? (
               <p className="text-muted small mb-0">Loading your list…</p>
@@ -70,7 +131,7 @@ export default function StorePricesPage() {
             ) : (
             <>
             <p className="text-muted small mb-3">
-              Your grocery list. Totals use the same algorithm as Budget and Home.
+              Green cells = cheapest price for that item. Totals use the Cheapest Basket Engine.
             </p>
             <div className="table-responsive">
               <table className="table table-hover align-middle mb-0">
@@ -81,7 +142,7 @@ export default function StorePricesPage() {
                     <th className="text-end">Aldi</th>
                     <th className="text-end">Coles</th>
                     <th className="text-end">Woolworths</th>
-                    <th>Cheapest</th>
+                    <th>Best pick</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -89,28 +150,30 @@ export default function StorePricesPage() {
                     <tr key={row.id}>
                       <td className="fw-semibold">{row.name}</td>
                       <td className="text-center">{row.quantity}</td>
-                      <td className="text-end">
-                        {row.prices
-                          ? formatPrice(row.aldiTotal)
-                          : "—"}
-                      </td>
-                      <td className="text-end">
-                        {row.prices
-                          ? formatPrice(row.colesTotal)
-                          : "—"}
-                      </td>
-                      <td className="text-end">
-                        {row.prices
-                          ? formatPrice(row.woolworthsTotal)
-                          : "—"}
-                      </td>
+                      {["aldi", "coles", "woolworths"].map((store) => {
+                        const total = row[`${store}Total`];
+                        const isCheapest = row.cheapest === store && row.prices;
+                        return (
+                          <td
+                            key={store}
+                            className="text-end fw-semibold"
+                            style={isCheapest ? { backgroundColor: "#d1fae5", color: "#065f46" } : {}}
+                          >
+                            {row.prices ? formatPrice(total) : "—"}
+                            {isCheapest && <span style={{ marginLeft: 4, fontSize: 12 }}>✓</span>}
+                          </td>
+                        );
+                      })}
                       <td>
                         {row.prices ? (
-                          <span className="pill text-nowrap">
+                          <span
+                            className="badge rounded-pill text-nowrap"
+                            style={{ backgroundColor: "var(--ss-accent)", color: "#fff" }}
+                          >
                             {STORE_LABELS[row.cheapest]}
                           </span>
                         ) : (
-                          "—"
+                          <span className="text-muted small">No data</span>
                         )}
                       </td>
                     </tr>
@@ -119,22 +182,20 @@ export default function StorePricesPage() {
                 <tfoot className="table-light">
                   <tr className="fw-bold">
                     <td colSpan={2}>Basket total</td>
-                    <td className="text-end">
-                      {formatPrice(totals.aldi)}
-                    </td>
-                    <td className="text-end">
-                      {formatPrice(totals.coles)}
-                    </td>
-                    <td className="text-end">
-                      {formatPrice(totals.woolworths)}
-                    </td>
+                    {["aldi", "coles", "woolworths"].map((store) => (
+                      <td
+                        key={store}
+                        className="text-end"
+                        style={store === bestStore ? { backgroundColor: "#d1fae5", color: "#065f46" } : {}}
+                      >
+                        {formatPrice(totals[store])}
+                        {store === bestStore && <span style={{ marginLeft: 4, fontSize: 12 }}>✓</span>}
+                      </td>
+                    ))}
                     <td>
                       <span
                         className="badge rounded-pill"
-                        style={{
-                          backgroundColor: "var(--ss-accent)",
-                          color: "#fff",
-                        }}
+                        style={{ backgroundColor: "var(--ss-accent)", color: "#fff" }}
                       >
                         Best: {STORE_LABELS[bestStore]}
                       </span>
@@ -146,26 +207,6 @@ export default function StorePricesPage() {
             </>
             )}
           </div>
-
-          {list.length > 0 && (
-          <div className="hero-card p-4">
-            <h5 className="mb-2">Summary</h5>
-            <ul className="list-unstyled mb-0 text-muted small">
-              <li className="mb-1">
-                <strong className="text-dark">Aldi</strong> → {formatPrice(totals.aldi)}
-              </li>
-              <li className="mb-1">
-                <strong className="text-dark">Coles</strong> → {formatPrice(totals.coles)}
-              </li>
-              <li className="mb-1">
-                <strong className="text-dark">Woolworths</strong> → {formatPrice(totals.woolworths)}
-              </li>
-              <li className="mt-2 pt-2 border-top">
-                <strong className="text-dark">Cheapest basket:</strong> {STORE_LABELS[bestStore]} at {formatPrice(totals[bestStore])}
-              </li>
-            </ul>
-          </div>
-          )}
 
           <div className="mt-4 p-3 rounded-3 bg-light border">
             <h6 className="mb-2">Real data later</h6>
@@ -182,7 +223,7 @@ export default function StorePricesPage() {
             © <span>{year}</span> StudentSaver. All rights reserved.
           </span>
           <span className="text-muted small">
-            Grocery list → pricing engine (coming soon).
+            Prices are demo data. Real store prices coming soon.
           </span>
         </div>
       </footer>

@@ -30,20 +30,33 @@ export default function GroceryListPage() {
           <GroceryListBuilder list={list} onListChange={setList} />
           {basketResult && (
             <div className="hero-card p-4 mt-4">
-              <h5 className="mb-3">Cheapest basket (preview)</h5>
-              <p className="text-muted small mb-2">Demo prices (Aldi, Coles, Woolworths). Algorithm: Le.</p>
-              <ul className="list-unstyled mb-2">
-                {Object.entries(basketResult.totalsByStore).map(([store, total]) => (
-                  <li key={store} className="mb-1">
-                    {store} → ${total.toFixed(2)}
-                  </li>
-                ))}
-              </ul>
-              {basketResult.bestStore && (
-                <p className="mb-0 fw-semibold">Best store: {basketResult.bestStore} (${basketResult.bestTotal.toFixed(2)})</p>
-              )}
+              <h5 className="mb-1">Cheapest basket</h5>
+              <p className="text-muted small mb-3">Compare the prices at Aldi, Coles, and Woolworths.</p>
+              <div className="d-flex gap-2 flex-wrap mb-3">
+                {Object.entries(basketResult.totalsByStore)
+                  .sort((a, b) => a[1] - b[1])
+                  .map(([store, total]) => {
+                    const labels = { aldi: "Aldi", coles: "Coles", woolworths: "Woolworths" };
+                    const isBest = store === basketResult.bestStore;
+                    return (
+                      <div
+                        key={store}
+                        className="text-center px-3 py-2 rounded-3"
+                        style={{
+                          backgroundColor: isBest ? "var(--ss-accent)" : "#f1f3f5",
+                          color: isBest ? "#fff" : "#555",
+                          minWidth: 90,
+                        }}
+                      >
+                        <div className="fw-bold small">{labels[store]}</div>
+                        <div className="fw-semibold">${total.toFixed(2)}</div>
+                        {isBest && <div style={{ fontSize: 10 }}>CHEAPEST</div>}
+                      </div>
+                    );
+                  })}
+              </div>
               {basketResult.missingItems.length > 0 && (
-                <p className="text-muted small mb-0 mt-2">No price for: {basketResult.missingItems.join(", ")}</p>
+                <p className="text-muted small mb-0">No price data for: {basketResult.missingItems.join(", ")}</p>
               )}
             </div>
           )}
