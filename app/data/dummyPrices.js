@@ -54,7 +54,17 @@ export function getPriceKey(name) {
  */
 export function getPrices(itemName, priceDb = dummyPriceDatabase) {
   const key = getPriceKey(itemName);
-  return priceDb[key] ?? null;
+  const existing = priceDb[key];
+  if (existing) return existing;
+
+  // Fallback dummy pricing for any other item name.
+  // Deterministic per key so values stay stable across renders.
+  if (!key) return null;
+  const base = 3 + (key.length % 4); // 3–6
+  const aldi = base;
+  const coles = base + 0.4;
+  const woolworths = base + 0.7;
+  return { aldi, coles, woolworths };
 }
 
 /**

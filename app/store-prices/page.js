@@ -190,6 +190,67 @@ export default function StorePricesPage() {
             </p>
           </div>
 
+          {/* Recommendation banner */}
+          {!loading && list.length > 0 && basketResult && (
+            <div
+              className="hero-card p-4 mb-4 border-2"
+              style={{ borderColor: "var(--ss-accent)", borderStyle: "solid", borderRadius: "1rem" }}
+            >
+              <div className="d-flex align-items-center gap-3 flex-wrap">
+                <div
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: "50%",
+                    backgroundColor: "var(--ss-accent)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 26,
+                    flexShrink: 0,
+                  }}
+                >
+                  🏆
+                </div>
+                <div className="flex-grow-1">
+                  <h5 className="mb-1 fw-bold">
+                    Shop at <span style={{ color: "var(--ss-accent)" }}>{STORE_LABELS[bestStore]}</span> to save the most
+                  </h5>
+                  <p className="mb-0 text-muted small">
+                    Your cheapest basket is{" "}
+                    <strong className="text-dark">{formatPrice(totals[bestStore])}</strong>
+                    {(() => {
+                      const worstTotal = Math.max(...Object.values(totals).filter(Boolean));
+                      const savings = worstTotal - totals[bestStore];
+                      return savings > 0 ? (
+                        <> — you save <strong className="text-success">{formatPrice(savings)}</strong> vs the most expensive option</>
+                      ) : null;
+                    })()}
+                  </p>
+                </div>
+                <div className="d-flex gap-2 flex-wrap">
+                  {Object.entries(totals)
+                    .sort((a, b) => a[1] - b[1])
+                    .map(([store, total], i) => (
+                      <div
+                        key={store}
+                        className="text-center px-3 py-2 rounded-3"
+                        style={{
+                          backgroundColor: store === bestStore ? "var(--ss-accent)" : "#f1f3f5",
+                          color: store === bestStore ? "#fff" : "#555",
+                          minWidth: 90,
+                        }}
+                      >
+                        <div className="fw-bold small">{STORE_LABELS[store]}</div>
+                        <div className="fw-semibold">{formatPrice(total)}</div>
+                        {i === 0 && <div style={{ fontSize: 10 }}>CHEAPEST</div>}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="hero-card p-4 mb-4">
             {authLoading || loading ? (
               <p className="text-muted small mb-0">Loading your list…</p>
