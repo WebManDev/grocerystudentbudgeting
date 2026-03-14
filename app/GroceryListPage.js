@@ -9,7 +9,6 @@ import { dummyPriceDatabase } from "./data/dummyPrices";
 export default function GroceryListPage() {
   const { user, authLoading } = useAuth();
   const { list, setList, loading, firebaseError } = useGroceryListFirestore(user);
-  const { list, setList, loading, firebaseError } = useGroceryListFirestore();
 
   const basketResult = list.length > 0 ? calculateBasketTotals(list, dummyPriceDatabase) : null;
 

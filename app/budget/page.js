@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AppNav } from "../components/AppNav";
 import { useGroceryListFirestore } from "../hooks/useGroceryListFirestore";
+import { useAuth } from "../contexts/AuthContext";
 import { calculateBasketTotals } from "../lib/cheapestBasket";
 import { dummyPriceDatabase } from "../data/dummyPrices";
 
 const STORE_LABELS = { aldi: "Aldi", coles: "Coles", woolworths: "Woolworths" };
-import { useAuth } from "../contexts/AuthContext";
 
 export default function BudgetPage() {
   const year = new Date().getFullYear();
@@ -17,9 +17,6 @@ export default function BudgetPage() {
   const [budget, setBudget] = useState("");
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
@@ -36,7 +33,6 @@ export default function BudgetPage() {
   const budgetNum = parseFloat(String(budget).replace(/[^0-9.]/g, "")) || 0;
   const basketResult = list.length > 0 ? calculateBasketTotals(list, dummyPriceDatabase) : null;
   const basketTotal = basketResult?.bestTotal ?? null;
-  const basketTotal = null;
   const remaining = basketTotal != null && budgetNum > 0 ? budgetNum - basketTotal : null;
   const mostExpensiveStore = basketResult?.totalsByStore
     ? Object.entries(basketResult.totalsByStore).reduce((a, b) => (b[1] > a[1] ? b : a), ["", 0])[0]
@@ -170,13 +166,13 @@ export default function BudgetPage() {
           </div>
 
           {savingsVsWorst > 0 && mostExpensiveStore && basketResult?.bestStore && (
-            <div className="hero-card p-4 mt-4 border-success border-2">
+            <div className="ss-card mt-4" style={{ borderColor: "#bbf7d0", borderWidth: 2 }}>
               <h5 className="mb-2">Savings &amp; insights</h5>
               <p className="mb-1">
-                You save <strong className="text-success">${savingsVsWorst.toFixed(2)}</strong> by shopping at {STORE_LABELS[basketResult.bestStore]} instead of {STORE_LABELS[mostExpensiveStore]}.
+                You save <strong style={{ color: "var(--ss-accent)" }}>${savingsVsWorst.toFixed(2)}</strong> by shopping at {STORE_LABELS[basketResult.bestStore]} instead of {STORE_LABELS[mostExpensiveStore]}.
               </p>
-              <p className="text-muted small mb-0">
-                Budget: ${budgetNum.toFixed(2)} · Cheapest basket: ${basketTotal.toFixed(2)} · Remaining: ${remaining.toFixed(2)}
+              <p style={{ fontSize: "0.82rem", color: "var(--ss-muted)", marginBottom: 0 }}>
+                Budget: ${budgetNum.toFixed(2)} · Cheapest basket: ${basketTotal.toFixed(2)} · Remaining: ${remaining?.toFixed(2) ?? "—"}
               </p>
             </div>
           )}
