@@ -44,12 +44,13 @@ Respond with ONLY the JSON array. No explanation, no markdown, no backticks.`;
             Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
           },
           body: JSON.stringify({
-            model,
+            model: "mistralai/mistral-7b-instruct:free",
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },
             ],
-            temperature: 0.3,
+            temperature: 0.2,
+            max_tokens: 500,
           }),
         }
       );
