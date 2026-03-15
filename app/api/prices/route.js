@@ -4,9 +4,18 @@
  */
 
 const HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  Accept: "application/json",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-AU,en;q=0.9",
+  "Accept-Encoding": "gzip, deflate, br",
+  Referer: "https://www.woolworths.com.au/",
+  Origin: "https://www.woolworths.com.au",
+  "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
+  "sec-fetch-dest": "empty",
+  "sec-fetch-mode": "cors",
+  "sec-fetch-site": "same-origin",
 };
 
 // ─── Quantity normalisation ───────────────────────────────────────────────────
@@ -34,13 +43,13 @@ function extractQuantity(name) {
 
 function toBaseUnit(value, unit) {
   switch (unit) {
-    case "ml":     return { value: value / 1000, unit: "l" };
-    case "l":      return { value, unit: "l" };
-    case "g":      return { value: value / 1000, unit: "kg" };
-    case "kg":     return { value, unit: "kg" };
+    case "ml": return { value: value / 1000, unit: "l" };
+    case "l": return { value, unit: "l" };
+    case "g": return { value: value / 1000, unit: "kg" };
+    case "kg": return { value, unit: "kg" };
     case "sheets":
-    case "sheet":  return { value: value / 100, unit: "100 sheets" };
-    default:       return { value, unit };
+    case "sheet": return { value: value / 100, unit: "100 sheets" };
+    default: return { value, unit };
   }
 }
 
