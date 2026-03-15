@@ -140,10 +140,13 @@ function scoreCandidate(p, query) {
 function buildResult(best, query) {
   if (!best) return null;
   const norm = getNormalisedPrice(best.price, best.name);
+  // Fall back to pre-calculated unit price from Coles API if we couldn't parse it
+  const normalisedPrice = norm?.normalisedPrice ?? best.unitPrice ?? null;
+  const normalisedUnit = norm?.unit ?? best.unitPriceLabel ?? null;
   return {
     price: best.price,
-    normalisedPrice: norm?.normalisedPrice ?? null,
-    normalisedUnit: norm?.unit ?? null,
+    normalisedPrice,
+    normalisedUnit,
     productName: best.name,
     url: best.url ?? `https://www.coles.com.au/search?q=${encodeURIComponent(query)}`,
   };
@@ -189,11 +192,19 @@ export async function GET(request) {
     }
 
     const candidates = results
-      .map((r) => ({
-        name: r.name ?? r.Name ?? "",
-        price: r?.pricing?.now ?? r?.Price?.now ?? r?.price ?? null,
-        url: r.slug ? `https://www.coles.com.au/product/${r.slug}` : null,
-      }))
+      .map((r) => {
+        const baseName = r.name ?? r.Name ?? "";
+        const size = r.size ?? r.Size ?? r.packageSize ?? r.PackageSize ?? "";
+        // Append size to name if not already present — needed for normalisation
+        const fullName = size && !baseName.toLowerCase().includes(size.toLowerCase())
+          ? `${baseName} ${size}`
+          : baseName;
+        return {
+          name: fullName,
+          price: r?.pricing?.now ?? r?.Price?.now ?? r?.price ?? null,
+          url: r.slug ? `https://www.coles.com.au/product/${r.slug}` : null,
+        };
+      })
       .filter((c) => typeof c.price === "number" && c.price > 0);
 
     console.log("Coles candidates:", candidates.slice(0, 3).map(c => `${c.name} $${c.price}`));
