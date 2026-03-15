@@ -1,39 +1,10 @@
 import "server-only";
-import { readFileSync, writeFileSync } from "fs";
-import { join } from "path";
 
-const CACHE_FILE = join(process.cwd(), ".coles-build-id-cache.json");
-const COLES_CACHE_TTL = 30 * 60 * 1000; // 30 min
-
+const COLES_CACHE_TTL = 30 * 60 * 1000;
 let memCache = { buildId: null, cachedAt: null };
 
-function loadDiskCache() {
-  try {
-    const raw = readFileSync(CACHE_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    if (parsed.buildId && parsed.cachedAt) {
-      memCache = parsed;
-    }
-  } catch {
-    // No cache file yet — that's fine
-  }
-}
-
-function saveDiskCache(buildId) {
-  const entry = { buildId, cachedAt: Date.now() };
-  memCache = entry;
-  try {
-    writeFileSync(CACHE_FILE, JSON.stringify(entry), "utf8");
-  } catch (e) {
-    console.warn("Could not write Coles buildId cache:", e.message);
-  }
-}
-
-loadDiskCache();
-
 const COLES_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
   Accept: "application/json, text/html, */*",
   "Accept-Language": "en-AU,en;q=0.9",
   Referer: "https://www.coles.com.au/",
@@ -42,11 +13,11 @@ const COLES_HEADERS = {
 async function getColesBuildId() {
   const now = Date.now();
   if (memCache.buildId && memCache.cachedAt && now - memCache.cachedAt < COLES_CACHE_TTL) {
-    console.log("Coles buildId from memory cache:", memCache.buildId);
+    console.log("Coles buildId from cache:", memCache.buildId);
     return memCache.buildId;
   }
 
-  console.log("Fetching fresh Coles buildId from homepage...");
+  console.log("Fetching fresh Coles buildId...");
   try {
     const res = await fetch("https://www.coles.com.au", {
       headers: {
@@ -55,35 +26,28 @@ async function getColesBuildId() {
         "Accept-Language": "en-AU,en;q=0.9",
       },
     });
-    console.log("Coles homepage response status:", res.status);
+    console.log("Coles homepage status:", res.status);
     if (res.ok) {
       const html = await res.text();
-      console.log("Coles homepage HTML length:", html.length);
-      const match =
-        html.match(/"buildId"\s*:\s*"([^"]+)"/) ||
-        html.match(/<script id="__NEXT_DATA__"[^>]*>[\s\S]*?"buildId"\s*:\s*"([^"]+)"/);
+      const match = html.match(/"buildId"\s*:\s*"([^"]+)"/);
       if (match?.[1]) {
         console.log("Coles buildId found:", match[1]);
-        saveDiskCache(match[1]);
+        memCache = { buildId: match[1], cachedAt: Date.now() };
         return match[1];
-      } else {
-        console.warn("Coles buildId not found in HTML. First 500 chars:", html.slice(0, 500));
       }
+      console.warn("buildId not found in HTML, first 300 chars:", html.slice(0, 300));
     }
   } catch (e) {
-    console.warn("Coles homepage fetch failed:", e.message);
+    console.warn("Coles homepage fetch error:", e.message);
   }
 
   if (memCache.buildId) {
-    console.warn("Using stale Coles buildId as fallback:", memCache.buildId);
+    console.warn("Using stale buildId:", memCache.buildId);
     return memCache.buildId;
   }
 
-  console.warn("No Coles buildId available at all");
   return null;
 }
-
-// ─── Normalisation ────────────────────────────────────────────────────────────
 
 function extractQuantity(name) {
   const weightVol = name.match(/(\d+(\.\d+)?)\s*(ml|l|g|kg)/i);
@@ -97,13 +61,13 @@ function extractQuantity(name) {
 
 function toBaseUnit(value, unit) {
   switch (unit) {
-    case "ml":    return { value: value / 1000, unit: "l" };
-    case "l":     return { value, unit: "l" };
-    case "g":     return { value: value / 1000, unit: "kg" };
-    case "kg":    return { value, unit: "kg" };
+    case "ml": return { value: value / 1000, unit: "l" };
+    case "l": return { value, unit: "l" };
+    case "g": return { value: value / 1000, unit: "kg" };
+    case "kg": return { value, unit: "kg" };
     case "sheets":
     case "sheet": return { value: value / 100, unit: "100 sheets" };
-    default:      return { value, unit };
+    default: return { value, unit };
   }
 }
 
@@ -149,8 +113,6 @@ function buildResult(best, query) {
   };
 }
 
-// ─── GET handler ──────────────────────────────────────────────────────────────
-
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const q = searchParams.get("q");
@@ -158,31 +120,28 @@ export async function GET(request) {
     return Response.json({ error: "Missing q param" }, { status: 400 });
   }
 
-  const buildId = await getColesBuildId();
-  console.log("Coles buildId result:", buildId);
-  console.log("Coles cache state:", JSON.stringify(memCache));
-
-  if (!buildId) {
-    return Response.json({ error: "Could not fetch Coles buildId" }, { status: 502 });
-  }
-
-  const url = `https://www.coles.com.au/_next/data/${buildId}/en/search/products.json?q=${encodeURIComponent(q)}`;
-  console.log("Coles search URL:", url);
-
   try {
+    const buildId = await getColesBuildId();
+    console.log("buildId result:", buildId);
+
+    if (!buildId) {
+      return Response.json({ result: null, error: "Could not fetch Coles buildId" });
+    }
+
+    const url = `https://www.coles.com.au/_next/data/${buildId}/en/search/products.json?q=${encodeURIComponent(q)}`;
+    console.log("Fetching:", url);
+
     const res = await fetch(url, { headers: COLES_HEADERS });
-    console.log("Coles search response status:", res.status, "for query:", q);
+    console.log("Coles search status:", res.status, "for:", q);
 
     if (!res.ok) {
-      // BuildId likely expired — clear cache so next request refreshes
       memCache = { buildId: null, cachedAt: null };
-      saveDiskCache(null);
-      return Response.json({ error: `Coles returned ${res.status}` }, { status: 502 });
+      return Response.json({ result: null, error: `Coles returned ${res.status}` });
     }
 
     const data = await res.json();
     const results = data?.pageProps?.searchResults?.results;
-    console.log("Coles results count:", Array.isArray(results) ? results.length : "not array");
+    console.log("Results count:", Array.isArray(results) ? results.length : "none");
 
     if (!Array.isArray(results) || results.length === 0) {
       return Response.json({ result: null });
@@ -196,8 +155,6 @@ export async function GET(request) {
       }))
       .filter((c) => typeof c.price === "number" && c.price > 0);
 
-    console.log("Coles candidates:", candidates.slice(0, 3).map(c => `${c.name} $${c.price}`));
-
     if (candidates.length === 0) return Response.json({ result: null });
 
     let best = null, bestScore = Infinity;
@@ -206,10 +163,12 @@ export async function GET(request) {
       if (score < bestScore) { bestScore = score; best = c; }
     }
 
-    console.log("Coles best pick:", best?.name, "$" + best?.price);
+    console.log("Best pick:", best?.name, "$" + best?.price);
     return Response.json({ result: buildResult(best, q) });
+
   } catch (e) {
     console.error("Coles proxy error:", e.message);
-    return Response.json({ error: e.message }, { status: 500 });
+    // Return null result instead of 500 — frontend handles gracefully
+    return Response.json({ result: null, error: e.message });
   }
 }

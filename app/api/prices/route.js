@@ -209,12 +209,18 @@ async function searchAldi(searchTerm) {
 
 async function fetchPricesForItem(searchTerm) {
   const [woolworths, aldi] = await Promise.allSettled([
-    searchWoolworths(searchTerm),
-    searchAldi(searchTerm),
+    searchWoolworths(searchTerm).catch((e) => {
+      console.warn("Woolworths error:", e.message);
+      return null;
+    }),
+    searchAldi(searchTerm).catch((e) => {
+      console.warn("Aldi error:", e.message);
+      return null;
+    }),
   ]);
   return {
     woolworths: woolworths.status === "fulfilled" ? woolworths.value : null,
-    coles: null, // fetched via /api/coles-proxy from page.js
+    coles: null,
     aldi: aldi.status === "fulfilled" ? aldi.value : null,
   };
 }
